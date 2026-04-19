@@ -1,0 +1,26 @@
+[
+  {
+    "id": 101,
+    "make": "Toyota",
+    "model": "Hilux",
+    "year": 2023,
+    "price": 395000,
+    "mileage": 18500,
+    "color": "White",
+    "status": "sold",
+    "soldDate": "2026-03-28T10:00:00.000Z",
+    "image": "https://picsum.photos/id/1015/600/400"
+  },
+  {
+    "id": 102,
+    "make": "Ford",
+    "model": "Ranger",
+    "year": 2022,
+    "price": 320000,
+    "mileage": 32000,
+    "color": "Red",
+    "status": "sold",
+    "soldDate": "2026-04-02T14:30:00.000Z",
+    "image": "https://picsum.photos/id/201/600/400"
+  }
+]

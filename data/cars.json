@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "make": "Toyota",
+    "model": "Hilux",
+    "year": 2024,
+    "price": 450000,
+    "mileage": 1200,
+    "color": "Pearl White",
+    "status": "available",
+    "description": "Legendary Zambian workhorse. Full service history.",
+    "image": "https://picsum.photos/id/1015/600/400"
+  },
+  {
+    "id": 2,
+    "make": "Ford",
+    "model": "Ranger",
+    "year": 2023,
+    "price": 380000,
+    "mileage": 8500,
+    "color": "Blue",
+    "status": "available",
+    "description": "Powerful 4x4 ready for any road.",
+    "image": "https://picsum.photos/id/201/600/400"
+  },
+  {
+    "id": 3,
+    "make": "Toyota",
+    "model": "Corolla",
+    "year": 2025,
+    "price": 285000,
+    "mileage": 300,
+    "color": "Silver",
+    "status": "available",
+    "description": "Brand new, fuel efficient daily driver.",
+    "image": "https://picsum.photos/id/29/600/400"
+  },
+  {
+    "id": 4,
+    "make": "Isuzu",
+    "model": "D-Max",
+    "year": 2024,
+    "price": 420000,
+    "mileage": 4500,
+    "color": "Matte Black",
+    "status": "available",
+    "description": "Built for business and adventure.",
+    "image": "https://picsum.photos/id/133/600/400"
+  }
+]

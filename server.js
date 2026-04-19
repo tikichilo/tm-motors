@@ -1,7 +1,7 @@
 const express = require('express');
-const Database = require('better-sqlite3');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,190 +13,191 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
-// LOG REQUESTS
 app.use((req, res, next) => {
     console.log(`📡 ${req.method} ${req.url}`);
     next();
 });
 
+// =======================
 // SERVE FRONTEND
+// =======================
 const publicPath = path.join(__dirname, 'public');
 app.use(express.static(publicPath));
 
 // =======================
-// DATABASE (FIXED)
+// SIMPLE JSON DATABASE
 // =======================
-const db = new Database('./cars.db');
+const DB_FILE = path.join(__dirname, 'db.json');
 
-console.log("✅ Connected to SQLite (better-sqlite3)");
+// ensure db exists
+if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, JSON.stringify({ cars: [], enquiries: [] }, null, 2));
+}
 
-// =======================
-// CREATE TABLES (SYNC FIX)
-// =======================
-db.prepare(`
-CREATE TABLE IF NOT EXISTS cars (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    make TEXT NOT NULL,
-    model TEXT NOT NULL,
-    year INTEGER,
-    price INTEGER NOT NULL,
-    mileage INTEGER,
-    color TEXT,
-    description TEXT,
-    image TEXT,
-    status TEXT DEFAULT 'available',
-    soldDate TEXT,
-    createdAt TEXT DEFAULT (datetime('now'))
-)
-`).run();
+function readDB() {
+    return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+}
 
-db.prepare(`
-CREATE TABLE IF NOT EXISTS enquiries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    userId INTEGER,
-    carId INTEGER,
-    name TEXT NOT NULL,
-    phone TEXT,
-    email TEXT,
-    message TEXT,
-    status TEXT DEFAULT 'new',
-    viewed INTEGER DEFAULT 0,
-    viewedAt TEXT,
-    repliedAt TEXT,
-    createdAt TEXT DEFAULT (datetime('now'))
-)
-`).run();
+function writeDB(data) {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
 
 // =======================
+// ROUTES
+// =======================
+
 // ROOT
-// =======================
 app.get('/', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 // =======================
-// CAR ROUTES
+// CARS
 // =======================
+
+// GET ALL CARS
+app.get('/api/cars', (req, res) => {
+    const db = readDB();
+    const cars = db.cars.filter(c => c.status === 'available');
+    res.json(cars);
+});
 
 // ADD CAR
 app.post('/api/cars', (req, res) => {
-    const { make, model, year, price, mileage, color, description, image } = req.body;
+    const db = readDB();
 
-    if (!make || !model || !price) {
-        return res.status(400).json({ error: "Make, model, price required" });
-    }
+    const newCar = {
+        id: Date.now(),
+        ...req.body,
+        status: 'available',
+        createdAt: new Date().toISOString()
+    };
 
-    const stmt = db.prepare(`
-        INSERT INTO cars (make, model, year, price, mileage, color, description, image, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'available')
-    `);
+    db.cars.push(newCar);
+    writeDB(db);
 
-    const result = stmt.run(make, model, year, price, mileage, color, description, image);
-
-    res.json({ success: true, id: result.lastInsertRowid });
-});
-
-// GET CARS
-app.get('/api/cars', (req, res) => {
-    const rows = db.prepare("SELECT * FROM cars WHERE status='available' ORDER BY id DESC").all();
-    res.json(rows);
+    res.json({ success: true, id: newCar.id });
 });
 
 // GET ONE CAR
 app.get('/api/cars/:id', (req, res) => {
-    const row = db.prepare("SELECT * FROM cars WHERE id=?").get(req.params.id);
+    const db = readDB();
+    const car = db.cars.find(c => c.id == req.params.id);
 
-    if (!row) return res.status(404).json({ error: "Not found" });
+    if (!car) return res.status(404).json({ error: "Not found" });
 
-    res.json(row);
+    res.json(car);
 });
 
 // UPDATE CAR
 app.put('/api/cars/:id', (req, res) => {
-    const { make, model, year, price, mileage, color, description, image } = req.body;
+    const db = readDB();
 
-    const stmt = db.prepare(`
-        UPDATE cars
-        SET make=?, model=?, year=?, price=?, mileage=?, color=?, description=?, image=?
-        WHERE id=?
-    `);
+    const index = db.cars.findIndex(c => c.id == req.params.id);
 
-    const result = stmt.run(make, model, year, price, mileage, color, description, image, req.params.id);
+    if (index === -1) {
+        return res.status(404).json({ error: "Not found" });
+    }
 
-    res.json({ updated: result.changes });
+    db.cars[index] = { ...db.cars[index], ...req.body };
+
+    writeDB(db);
+
+    res.json({ success: true });
 });
 
 // DELETE CAR
 app.delete('/api/cars/:id', (req, res) => {
-    const result = db.prepare("DELETE FROM cars WHERE id=?").run(req.params.id);
-    res.json({ deleted: result.changes });
+    const db = readDB();
+
+    db.cars = db.cars.filter(c => c.id != req.params.id);
+
+    writeDB(db);
+
+    res.json({ success: true });
 });
 
 // SELL CAR
 app.post('/api/sell', (req, res) => {
-    const { id } = req.body;
+    const db = readDB();
 
-    const result = db.prepare(`
-        UPDATE cars SET status='sold', soldDate=datetime('now') WHERE id=?
-    `).run(id);
+    const car = db.cars.find(c => c.id == req.body.id);
+    if (!car) return res.status(404).json({ error: "Not found" });
 
-    res.json({ updated: result.changes });
+    car.status = 'sold';
+    car.soldDate = new Date().toISOString();
+
+    writeDB(db);
+
+    res.json({ success: true });
 });
 
 // RESTORE CAR
 app.post('/api/restore', (req, res) => {
-    const { id } = req.body;
+    const db = readDB();
 
-    const result = db.prepare(`
-        UPDATE cars SET status='available', soldDate=NULL WHERE id=?
-    `).run(id);
+    const car = db.cars.find(c => c.id == req.body.id);
+    if (!car) return res.status(404).json({ error: "Not found" });
 
-    res.json({ success: true, updated: result.changes });
+    car.status = 'available';
+    car.soldDate = null;
+
+    writeDB(db);
+
+    res.json({ success: true });
 });
 
 // =======================
 // ENQUIRIES
 // =======================
 
+// ADD ENQUIRY
 app.post('/api/enquiries', (req, res) => {
-    let { userId, carId, name, phone, email, message } = req.body;
+    const db = readDB();
 
-    if (!name) return res.status(400).json({ error: "Name required" });
+    const enquiry = {
+        id: Date.now(),
+        ...req.body,
+        status: 'new',
+        createdAt: new Date().toISOString()
+    };
 
-    const stmt = db.prepare(`
-        INSERT INTO enquiries (userId, carId, name, phone, email, message)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `);
+    db.enquiries.push(enquiry);
+    writeDB(db);
 
-    const result = stmt.run(userId || null, carId || null, name, phone || null, email || null, message);
-
-    res.json({ success: true, id: result.lastInsertRowid });
+    res.json({ success: true, id: enquiry.id });
 });
 
+// GET ENQUIRIES
 app.get('/api/enquiries', (req, res) => {
-    const rows = db.prepare(`
-        SELECT e.*, c.make, c.model
-        FROM enquiries e
-        LEFT JOIN cars c ON e.carId = c.id
-        ORDER BY e.createdAt DESC
-    `).all();
-
-    res.json(rows);
+    const db = readDB();
+    res.json(db.enquiries);
 });
 
+// DELETE ENQUIRY
 app.delete('/api/enquiries/:id', (req, res) => {
-    const result = db.prepare("DELETE FROM enquiries WHERE id=?").run(req.params.id);
-    res.json({ success: true, deleted: result.changes });
+    const db = readDB();
+
+    db.enquiries = db.enquiries.filter(e => e.id != req.params.id);
+
+    writeDB(db);
+
+    res.json({ success: true });
 });
 
+// MARK AS REPLIED
 app.put('/api/enquiries/:id/replied', (req, res) => {
-    const result = db.prepare(`
-        UPDATE enquiries
-        SET status='replied', repliedAt=datetime('now')
-        WHERE id=?
-    `).run(req.params.id);
+    const db = readDB();
 
-    res.json({ success: true, updated: result.changes });
+    const enquiry = db.enquiries.find(e => e.id == req.params.id);
+    if (!enquiry) return res.status(404).json({ error: "Not found" });
+
+    enquiry.status = 'replied';
+    enquiry.repliedAt = new Date().toISOString();
+
+    writeDB(db);
+
+    res.json({ success: true });
 });
 
 // =======================
@@ -204,36 +205,60 @@ app.put('/api/enquiries/:id/replied', (req, res) => {
 // =======================
 
 app.get('/api/analytics/top-cars', (req, res) => {
-    const rows = db.prepare(`
-        SELECT c.id, c.make, c.model, COUNT(e.id) as total
-        FROM enquiries e
-        LEFT JOIN cars c ON e.carId = c.id
-        GROUP BY e.carId
-        ORDER BY total DESC
-        LIMIT 5
-    `).all();
+    const db = readDB();
 
-    res.json(rows);
+    const stats = {};
+
+    db.enquiries.forEach(e => {
+        if (e.carId) {
+            stats[e.carId] = (stats[e.carId] || 0) + 1;
+        }
+    });
+
+    const result = Object.keys(stats).map(id => {
+        const car = db.cars.find(c => c.id == id);
+        return {
+            id,
+            make: car?.make,
+            model: car?.model,
+            total: stats[id]
+        };
+    });
+
+    res.json(result.sort((a, b) => b.total - a.total).slice(0, 5));
 });
 
 app.get('/api/analytics/enquiries-per-day', (req, res) => {
-    const rows = db.prepare(`
-        SELECT DATE(createdAt) as date, COUNT(*) as total
-        FROM enquiries
-        GROUP BY DATE(createdAt)
-        ORDER BY date ASC
-    `).all();
+    const db = readDB();
 
-    res.json(rows);
+    const map = {};
+
+    db.enquiries.forEach(e => {
+        const date = new Date(e.createdAt).toISOString().split('T')[0];
+        map[date] = (map[date] || 0) + 1;
+    });
+
+    const result = Object.keys(map).map(date => ({
+        date,
+        total: map[date]
+    }));
+
+    res.json(result);
 });
 
 app.get('/api/analytics/conversion', (req, res) => {
-    const enquiries = db.prepare("SELECT COUNT(*) as count FROM enquiries").get().count;
-    const sold = db.prepare("SELECT COUNT(*) as count FROM cars WHERE status='sold'").get().count;
+    const db = readDB();
+
+    const enquiries = db.enquiries.length;
+    const sold = db.cars.filter(c => c.status === 'sold').length;
 
     const rate = enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0;
 
-    res.json({ enquiries, sold, conversionRate: rate });
+    res.json({
+        enquiries,
+        sold,
+        conversionRate: rate
+    });
 });
 
 // =======================

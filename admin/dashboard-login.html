@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>T&M Motors — Dashboard Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --gold: #F5B800;
+    --gold-light: #FFD84D;
+    --gold-dim: #A67C00;
+    --gold-glow: rgba(245,184,0,0.18);
+    --dark: #0D0F12;
+    --dark-2: #13161A;
+    --dark-3: #1A1E24;
+    --dark-4: #22272F;
+    --dark-5: #2C3340;
+    --text: #E8E4D9;
+    --text-muted: #7A8090;
+    --text-dim: #4A5060;
+    --border: rgba(245,184,0,0.12);
+    --border-bright: rgba(245,184,0,0.35);
+    --danger: #E05555;
+    --success: #4CAF82;
+    --radius: 12px;
+    --radius-lg: 20px;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Montserrat', sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Ambient background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 50%, rgba(245,184,0,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 10% 90%, rgba(245,184,0,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ===== LEFT PANEL ===== */
+  .left-panel {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 80px;
+    background: var(--dark-2);
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .left-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 60px,
+        rgba(245,184,0,0.02) 60px,
+        rgba(245,184,0,0.02) 61px
+      );
+    pointer-events: none;
+  }
+
+  .left-panel::after {
+    content: '';
+    position: absolute;
+    bottom: -120px;
+    left: -120px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(245,184,0,0.08) 0%, transparent 65%);
+    pointer-events: none;
+  }
+
+  .panel-brand {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    animation: panelIn 0.8s cubic-bezier(0.4,0,0.2,1) both;
+  }
+
+  .panel-logo {
+    width: 110px;
+    height: 110px;
+    margin: 0 auto 28px;
+    position: relative;
+  }
+
+  .panel-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 30px rgba(245,184,0,0.4));
+    animation: logoFloat 4s ease-in-out infinite;
+  }
+
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .panel-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+
+  .panel-title span { color: var(--gold); }
+
+  .panel-tagline {
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 40px;
+  }
+
+  .panel-divider {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 0 auto 40px;
+  }
+
+  .panel-features {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--dark-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: var(--transition);
+    animation: featureIn 0.6s cubic-bezier(0.4,0,0.2,1) both;
+  }
+
+  .feature-item:nth-child(1) { animation-delay: 0.3s; }
+  .feature-item:nth-child(2) { animation-delay: 0.45s; }
+  .feature-item:nth-child(3) { animation-delay: 0.6s; }
+
+  .feature-item:hover {
+    border-color: var(--border-bright);
+    background: var(--dark-4);
+  }
+
+  .feature-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--gold-glow);
+    border: 1px solid var(--border-bright);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .feature-text h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .feature-text p {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ===== RIGHT PANEL (FORM) ===== */
+  .right-panel {
+    width: 520px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px 56px;
+    position: relative;
+    z-index: 1;
+    animation: formIn 0.7s cubic-bezier(0.4,0,0.2,1) both;
+    animation-delay: 0.1s;
+  }
+
+  @keyframes formIn {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes panelIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes featureIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .form-header { margin-bottom: 40px; }
+
+  .form-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gold-glow);
+    border: 1px solid var(--border-bright);
+    color: var(--gold);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+
+  .form-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+  }
+
+  .form-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+
+  .form-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* ===== FORM FIELDS ===== */
+  .form-group { margin-bottom: 20px; }
+
+  .form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .input-wrap {
+    position: relative;
+  }
+
+  .input-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 16px;
+    pointer-events: none;
+    transition: var(--transition);
+  }
+
+  .form-input {
+    width: 100%;
+    background: var(--dark-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px 14px 46px;
+    color: var(--text);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: var(--transition);
+    letter-spacing: 0.02em;
+  }
+
+  .form-input::placeholder { color: var(--text-dim); }
+
+  .form-input:focus {
+    border-color: var(--gold);
+    background: var(--dark-4);
+    box-shadow: 0 0 0 3px var(--gold-glow), inset 0 0 0 1px rgba(245,184,0,0.1);
+  }
+
+  .form-input:focus + .input-icon,
+  .input-wrap:focus-within .input-icon { color: var(--gold); }
+
+  /* Password toggle */
+  .pass-toggle {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 4px;
+    transition: var(--transition);
+    line-height: 1;
+  }
+
+  .pass-toggle:hover { color: var(--gold); }
+
+  .pass-input { padding-right: 44px; }
+
+  /* Remember + Forgot */
+  .form-extras {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .remember-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+    user-select: none;
+  }
+
+  .remember-label input[type="checkbox"] { display: none; }
+
+  .custom-check {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border-bright);
+    background: var(--dark-3);
+    display: flex; align-items: center; justify-content: center;
+    transition: var(--transition);
+    flex-shrink: 0;
+  }
+
+  .remember-label input:checked ~ .custom-check {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+
+  .custom-check::after {
+    content: '✓';
+    font-size: 11px;
+    color: var(--dark);
+    font-weight: 700;
+    opacity: 0;
+    transition: var(--transition);
+  }
+
+  .remember-label input:checked ~ .custom-check::after { opacity: 1; }
+
+  .forgot-link {
+    font-size: 12px;
+    color: var(--gold);
+    text-decoration: none;
+    font-weight: 500;
+    transition: var(--transition);
+  }
+
+  .forgot-link:hover { color: var(--gold-light); text-decoration: underline; }
+
+  /* Submit button */
+  .btn-primary {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+    color: var(--dark);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(245,184,0,0.25);
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0;
+    transition: var(--transition);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(245,184,0,0.4);
+  }
+
+  .btn-primary:hover::before { opacity: 1; }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-primary .btn-shine {
+    position: absolute;
+    top: -50%;
+    left: -75%;
+    width: 50%;
+    height: 200%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    transform: skewX(-20deg);
+    transition: 0.6s ease;
+  }
+
+  .btn-primary:hover .btn-shine { left: 125%; }
+
+  /* Divider */
+  .form-divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 28px 0;
+  }
+
+  .form-divider::before,
+  .form-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .form-divider span {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  /* Bottom link */
+  .form-footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .form-footer a {
+    color: var(--gold);
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--transition);
+  }
+
+  .form-footer a:hover { color: var(--gold-light); }
+
+  /* Error message */
+  .error-msg {
+    background: rgba(224,85,85,0.1);
+    border: 1px solid rgba(224,85,85,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--danger);
+    margin-bottom: 20px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .error-msg.show { display: flex; }
+
+  /* Success state */
+  .success-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(13,15,18,0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: 0.4s ease;
+  }
+
+  .success-overlay.show { opacity: 1; pointer-events: all; }
+
+  .success-icon {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: rgba(76,175,130,0.15);
+    border: 2px solid var(--success);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    color: var(--success);
+    margin-bottom: 20px;
+    animation: successPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }
+
+  @keyframes successPop {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .success-overlay h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .success-overlay p { font-size: 13px; color: var(--text-muted); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--dark-2); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="left-panel">
+  <div class="panel-brand">
+    <div class="panel-logo">
+      <img src="123456.png" alt="T&M Motors Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"/>
+      <div style="display:none; width:110px; height:110px; background:var(--gold); border-radius:50%; align-items:center; justify-content:center; font-size:36px; font-weight:700; color:var(--dark); font-family:'Cormorant Garamond',serif;">T&M</div>
+    </div>
+    <div class="panel-title">T<span>&</span>M Motors</div>
+    <div class="panel-tagline">Luxury · Performance · T&M</div>
+    <div class="panel-divider"></div>
+    <div class="panel-features">
+      <div class="feature-item">
+        <div class="feature-icon">🚗</div>
+        <div class="feature-text">
+          <h4>Inventory Management</h4>
+          <p>Full control over your showroom stock</p>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📊</div>
+        <div class="feature-text">
+          <h4>Analytics & Reports</h4>
+          <p>Sales performance at a glance</p>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">💬</div>
+        <div class="feature-text">
+          <h4>Customer Enquiries</h4>
+          <p>Manage leads and follow-ups</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="right-panel">
+  <div class="form-header">
+    <div class="form-badge">Admin Portal</div>
+    <div class="form-title">Welcome<br/>Back</div>
+    <div class="form-subtitle">Sign in to your dashboard to manage T&M Motors operations.</div>
+  </div>
+
+  <div class="error-msg" id="errorMsg">
+    ⚠️ <span id="errorText">Invalid email or password. Please try again.</span>
+  </div>
+
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label class="form-label">Email Address</label>
+      <div class="input-wrap">
+        <input type="email" class="form-input" id="email" placeholder="admin@tandmmotors.com" required autocomplete="email"/>
+        <span class="input-icon">✉</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="input-wrap">
+        <input type="password" class="form-input pass-input" id="password" placeholder="Enter your password" required autocomplete="current-password"/>
+        <span class="input-icon">🔒</span>
+        <button type="button" class="pass-toggle" onclick="togglePass('password', this)">👁</button>
+      </div>
+    </div>
+
+    <div class="form-extras">
+      <label class="remember-label">
+        <input type="checkbox" id="remember"/>
+        <div class="custom-check"></div>
+        Remember me
+      </label>
+      <a href="#" class="forgot-link">Forgot password?</a>
+    </div>
+
+    <button type="submit" class="btn-primary">
+      <span class="btn-shine"></span>
+      Sign In to Dashboard
+    </button>
+  </form>
+
+  <div class="form-divider"><span>Don't have an account?</span></div>
+
+  <div class="form-footer">
+    <<a href="/admin/dashboard-signup.html">>Create an admin account →</a>
+  </div>
+
+  <div class="form-footer" style="margin-top: 16px;">
+    Customer? <a href="showroom-login.html">Visit showroom portal →</a>
+  </div>
+</div>
+
+<div class="success-overlay" id="successOverlay">
+  <div class="success-icon">✓</div>
+  <h3>Access Granted</h3>
+  <p>Redirecting to your dashboard…</p>
+</div>
+
+<script>
+function togglePass(id, btn) {
+  const input = document.getElementById(id);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+// =========================
+// 🔥 REAL ADMIN LOGIN (FIXED)
+// =========================
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const errorMsg = document.getElementById('errorMsg');
+  const errorText = document.getElementById('errorText');
+
+  errorMsg.classList.remove('show');
+
+  if (!email || !password) {
+    errorText.textContent = 'Please fill in all fields.';
+    errorMsg.classList.add('show');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorText.textContent = data.error || 'Login failed';
+      errorMsg.classList.add('show');
+      return;
+    }
+
+    // 🔒 ADMIN CHECK
+    if (data.user.role !== 'admin') {
+      errorText.textContent = 'Access denied. Admins only.';
+      errorMsg.classList.add('show');
+      return;
+    }
+
+    // ✅ SAVE SESSION
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+
+    // SUCCESS UI
+    document.getElementById('successOverlay').classList.add('show');
+
+    // 🔥 FIXED REDIRECT (ABSOLUTE PATH SAFETY)
+   setTimeout(() => {
+  window.location.href = '/admin/dashboard.html';
+}, 1500);
+
+  } catch (err) {
+    console.error("Login error:", err);
+    errorText.textContent = 'Server error. Try again.';
+    errorMsg.classList.add('show');
+  }
+}
+
+// =========================
+// UI TOUCH (checkbox anim)
+// =========================
+document.querySelectorAll('.remember-label input').forEach(input => {
+  input.addEventListener('change', () => {
+    const box = input.parentElement.querySelector('.custom-check');
+    box.style.transform = input.checked ? 'scale(1.1)' : 'scale(1)';
+    setTimeout(() => {
+      box.style.transform = 'scale(1)';
+    }, 150);
+  });
+});
+</script>
+</body>
+</html>

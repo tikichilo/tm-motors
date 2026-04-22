@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>T&M Motors — Admin Registration</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --gold: #F5B800;
+    --gold-light: #FFD84D;
+    --gold-dim: #A67C00;
+    --gold-glow: rgba(245,184,0,0.18);
+    --dark: #0D0F12;
+    --dark-2: #13161A;
+    --dark-3: #1A1E24;
+    --dark-4: #22272F;
+    --dark-5: #2C3340;
+    --text: #E8E4D9;
+    --text-muted: #7A8090;
+    --text-dim: #4A5060;
+    --border: rgba(245,184,0,0.12);
+    --border-bright: rgba(245,184,0,0.35);
+    --danger: #E05555;
+    --success: #4CAF82;
+    --radius: 12px;
+    --radius-lg: 20px;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Montserrat', sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 60% at 30% 50%, rgba(245,184,0,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 90% 10%, rgba(245,184,0,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ===== LEFT FORM PANEL ===== */
+  .left-panel {
+    width: 560px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 50px 56px;
+    position: relative;
+    z-index: 1;
+    overflow-y: auto;
+    max-height: 100vh;
+  }
+
+  .form-header { margin-bottom: 36px; }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-decoration: none;
+    letter-spacing: 0.08em;
+    margin-bottom: 24px;
+    transition: var(--transition);
+    font-weight: 500;
+  }
+
+  .back-link:hover { color: var(--gold); }
+
+  .form-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gold-glow);
+    border: 1px solid var(--border-bright);
+    color: var(--gold);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+
+  .form-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+  }
+
+  .form-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+
+  .form-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* Progress steps */
+  .step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 36px;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    transition: var(--transition);
+  }
+
+  .step.active { color: var(--gold); }
+  .step.done { color: var(--success); }
+
+  .step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    transition: var(--transition);
+    flex-shrink: 0;
+  }
+
+  .step.active .step-num {
+    border-color: var(--gold);
+    background: var(--gold-glow);
+    color: var(--gold);
+  }
+
+  .step.done .step-num {
+    border-color: var(--success);
+    background: rgba(76,175,130,0.1);
+    color: var(--success);
+  }
+
+  .step-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    margin: 0 10px;
+  }
+
+  /* Form rows */
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .form-group { margin-bottom: 18px; }
+
+  .form-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 7px;
+  }
+
+  .input-wrap { position: relative; }
+
+  .input-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 15px;
+    pointer-events: none;
+    transition: var(--transition);
+  }
+
+  .form-input, .form-select {
+    width: 100%;
+    background: var(--dark-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 13px 14px 13px 42px;
+    color: var(--text);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    outline: none;
+    transition: var(--transition);
+    letter-spacing: 0.02em;
+    -webkit-appearance: none;
+  }
+
+  .form-input::placeholder { color: var(--text-dim); }
+  .form-select option { background: var(--dark-3); color: var(--text); }
+
+  .form-input:focus, .form-select:focus {
+    border-color: var(--gold);
+    background: var(--dark-4);
+    box-shadow: 0 0 0 3px var(--gold-glow);
+  }
+
+  .form-input:focus ~ .input-icon,
+  .form-select:focus ~ .input-icon,
+  .input-wrap:focus-within .input-icon { color: var(--gold); }
+
+  .select-arrow {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  .pass-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    transition: var(--transition);
+  }
+
+  .pass-toggle:hover { color: var(--gold); }
+  .pass-input { padding-right: 40px; }
+
+  /* Password strength */
+  .pass-strength {
+    margin-top: 8px;
+  }
+
+  .strength-bar {
+    height: 3px;
+    background: var(--dark-5);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+
+  .strength-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease, background 0.4s ease;
+    width: 0%;
+  }
+
+  .strength-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  /* Terms */
+  .terms-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 24px;
+    cursor: pointer;
+  }
+
+  .terms-check input { display: none; }
+
+  .custom-check {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border-bright);
+    background: var(--dark-3);
+    display: flex; align-items: center; justify-content: center;
+    transition: var(--transition);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .terms-check input:checked ~ .custom-check {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+
+  .custom-check::after {
+    content: '✓';
+    font-size: 11px;
+    color: var(--dark);
+    font-weight: 700;
+    opacity: 0;
+    transition: var(--transition);
+  }
+
+  .terms-check input:checked ~ .custom-check::after { opacity: 1; }
+
+  .terms-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .terms-text a { color: var(--gold); text-decoration: none; }
+  .terms-text a:hover { text-decoration: underline; }
+
+  /* Submit */
+  .btn-primary {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+    color: var(--dark);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(245,184,0,0.25);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(245,184,0,0.4);
+  }
+
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-shine {
+    position: absolute;
+    top: -50%;
+    left: -75%;
+    width: 50%;
+    height: 200%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    transform: skewX(-20deg);
+    transition: 0.6s ease;
+  }
+
+  .btn-primary:hover .btn-shine { left: 125%; }
+
+  .form-footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 20px;
+  }
+
+  .form-footer a { color: var(--gold); font-weight: 600; text-decoration: none; }
+  .form-footer a:hover { color: var(--gold-light); }
+
+  .error-msg {
+    background: rgba(224,85,85,0.1);
+    border: 1px solid rgba(224,85,85,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--danger);
+    margin-bottom: 18px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .error-msg.show { display: flex; }
+
+  /* ===== RIGHT PANEL ===== */
+  .right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 80px;
+    background: var(--dark-2);
+    border-left: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .right-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      45deg, transparent, transparent 60px,
+      rgba(245,184,0,0.02) 60px, rgba(245,184,0,0.02) 61px
+    );
+  }
+
+  .right-panel::after {
+    content: '';
+    position: absolute;
+    top: -100px;
+    right: -100px;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(245,184,0,0.1) 0%, transparent 65%);
+  }
+
+  .panel-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    animation: panelIn 0.8s ease both;
+  }
+
+  @keyframes panelIn {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .panel-logo {
+    width: 100px; height: 100px;
+    margin: 0 auto 28px;
+  }
+
+  .panel-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 28px rgba(245,184,0,0.4));
+    animation: logoFloat 4s ease-in-out infinite;
+  }
+
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .panel-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .panel-title span { color: var(--gold); }
+
+  .panel-sub {
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 50px;
+  }
+
+  .panel-divider {
+    width: 50px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 0 auto 48px;
+  }
+
+  /* Access level cards */
+  .access-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 340px;
+    text-align: left;
+  }
+
+  .access-card {
+    padding: 18px 20px;
+    background: var(--dark-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: var(--transition);
+    animation: cardIn 0.5s ease both;
+  }
+
+  .access-card:nth-child(1) { animation-delay: 0.3s; }
+  .access-card:nth-child(2) { animation-delay: 0.45s; }
+  .access-card:nth-child(3) { animation-delay: 0.6s; }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .access-card:hover {
+    border-color: var(--border-bright);
+    background: var(--dark-4);
+  }
+
+  .access-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .access-icon { font-size: 18px; }
+
+  .access-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .access-badge {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .badge-gold { background: var(--gold-glow); color: var(--gold); border: 1px solid var(--border-bright); }
+  .badge-silver { background: rgba(122,128,144,0.15); color: var(--text-muted); border: 1px solid rgba(122,128,144,0.2); }
+
+  .access-desc { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+  .success-overlay {
+    position: fixed; inset: 0;
+    background: rgba(13,15,18,0.9);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999;
+    opacity: 0; pointer-events: none;
+    transition: 0.4s ease;
+  }
+
+  .success-overlay.show { opacity: 1; pointer-events: all; }
+
+  .success-icon {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: rgba(76,175,130,0.15);
+    border: 2px solid var(--success);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    color: var(--success);
+    margin-bottom: 20px;
+    animation: successPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }
+
+  @keyframes successPop {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .success-overlay h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; color: var(--text); margin-bottom: 8px;
+  }
+
+  .success-overlay p { font-size: 13px; color: var(--text-muted); }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--dark-2); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="left-panel">
+  <a href="dashboard-login.html" class="back-link">← Back to Login</a>
+
+  <div class="form-header">
+    <div class="form-badge">Admin Registration</div>
+    <div class="form-title">Create Your<br/>Admin Account</div>
+    <div class="form-subtitle">Fill in your details to gain access to the T&M Motors management dashboard.</div>
+  </div>
+
+  <div class="step-indicator">
+    <div class="step active" id="step1">
+      <div class="step-num">1</div>
+      Personal Info
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step2">
+      <div class="step-num">2</div>
+      Contact
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step3">
+      <div class="step-num">3</div>
+      Security
+    </div>
+  </div>
+
+  <div class="error-msg" id="errorMsg">
+    ⚠️ <span id="errorText">Please fill in all required fields.</span>
+  </div>
+
+  <form id="signupForm" onsubmit="handleSignup(event)">
+    <!-- Personal Info -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">First Name</label>
+        <div class="input-wrap">
+          <input type="text" class="form-input" id="firstName" placeholder="John" required/>
+          <span class="input-icon">👤</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Last Name</label>
+        <div class="input-wrap">
+          <input type="text" class="form-input" id="lastName" placeholder="Doe" required/>
+          <span class="input-icon">👤</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Phone Number</label>
+      <div class="input-wrap">
+        <input type="tel" class="form-input" id="tel" placeholder="+260 97 123 4567" required/>
+        <span class="input-icon">📞</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Email Address</label>
+      <div class="input-wrap">
+        <input type="email" class="form-input" id="email" placeholder="john.doe@tandmmotors.com" required/>
+        <span class="input-icon">✉</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Province</label>
+      <div class="input-wrap">
+        <select class="form-select" id="province" required>
+          <option value="" disabled selected>Select your province</option>
+          <option value="central">Central Province</option>
+          <option value="copperbelt">Copperbelt Province</option>
+          <option value="eastern">Eastern Province</option>
+          <option value="luapula">Luapula Province</option>
+          <option value="lusaka">Lusaka Province</option>
+          <option value="muchinga">Muchinga Province</option>
+          <option value="northern">Northern Province</option>
+          <option value="northwestern">North-Western Province</option>
+          <option value="southern">Southern Province</option>
+          <option value="western">Western Province</option>
+        </select>
+        <span class="input-icon">📍</span>
+        <span class="select-arrow">▾</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="input-wrap">
+        <input type="password" class="form-input pass-input" id="password" placeholder="Create a strong password" required oninput="checkStrength(this.value)"/>
+        <span class="input-icon">🔒</span>
+        <button type="button" class="pass-toggle" onclick="togglePass('password', this)">👁</button>
+      </div>
+      <div class="pass-strength">
+        <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+        <div class="strength-label" id="strengthLabel">Enter a password</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Confirm Password</label>
+      <div class="input-wrap">
+        <input type="password" class="form-input pass-input" id="confirmPass" placeholder="Repeat your password" required/>
+        <span class="input-icon">🔒</span>
+        <button type="button" class="pass-toggle" onclick="togglePass('confirmPass', this)">👁</button>
+      </div>
+    </div>
+
+    <label class="terms-check">
+      <input type="checkbox" id="terms" required/>
+      <div class="custom-check"></div>
+      <span class="terms-text">I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a> of T&M Motors.</span>
+    </label>
+
+    <button type="submit" class="btn-primary">
+      <span class="btn-shine"></span>
+      Create Admin Account
+    </button>
+  </form>
+
+  <div class="form-footer">
+    Already have an account? <a href="dashboard-login.html">Sign in →</a>
+  </div>
+</div>
+
+<div class="right-panel">
+  <div class="panel-content">
+    <div class="panel-logo">
+      <img src="123456.png" alt="T&M Motors" onerror="this.style.display='none'"/>
+    </div>
+    <div class="panel-title">T<span>&</span>M Motors</div>
+    <div class="panel-sub">Admin Portal Access</div>
+    <div class="panel-divider"></div>
+    <div class="access-cards">
+      <div class="access-card">
+        <div class="access-card-header">
+          <span class="access-icon">🏆</span>
+          <span class="access-title">Super Admin</span>
+          <span class="access-badge badge-gold">Full Access</span>
+        </div>
+        <div class="access-desc">Complete control over inventory, sales, users and all system settings.</div>
+      </div>
+      <div class="access-card">
+        <div class="access-card-header">
+          <span class="access-icon">📋</span>
+          <span class="access-title">Sales Manager</span>
+          <span class="access-badge badge-silver">Standard</span>
+        </div>
+        <div class="access-desc">Manage cars, enquiries and view analytics reports.</div>
+      </div>
+      <div class="access-card">
+        <div class="access-card-header">
+          <span class="access-icon">👁</span>
+          <span class="access-title">Viewer</span>
+          <span class="access-badge badge-silver">Read-only</span>
+        </div>
+        <div class="access-desc">View inventory and reports without making changes.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="success-overlay" id="successOverlay">
+  <div class="success-icon">✓</div>
+  <h3>Account Created!</h3>
+  <p>Welcome to T&M Motors dashboard…</p>
+</div>
+
+<script>
+function togglePass(id, btn) {
+  const input = document.getElementById(id);
+  input.type = input.type === 'password' ? 'text' : 'password';
+  btn.textContent = input.type === 'password' ? '👁' : '🙈';
+}
+
+function checkStrength(val) {
+  const fill = document.getElementById('strengthFill');
+  const label = document.getElementById('strengthLabel');
+
+  let score = 0;
+  if (val.length >= 8) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+
+  const configs = [
+    { w: '0%', c: '', t: 'Enter a password' },
+    { w: '25%', c: '#E05555', t: 'Weak' },
+    { w: '50%', c: '#F5A623', t: 'Fair' },
+    { w: '75%', c: '#F5B800', t: 'Good' },
+    { w: '100%', c: '#4CAF82', t: 'Strong' },
+  ];
+
+  const cfg = configs[score] || configs[0];
+  fill.style.width = cfg.w;
+  fill.style.background = cfg.c;
+  label.textContent = cfg.t;
+  label.style.color = cfg.c || 'var(--text-dim)';
+}
+
+
+// =========================
+// 🔥 REAL ADMIN SIGNUP
+// =========================
+async function handleSignup(e) {
+  e.preventDefault();
+
+  const errorMsg = document.getElementById('errorMsg');
+  const errorText = document.getElementById('errorText');
+
+  errorMsg.classList.remove('show');
+
+  const firstName = document.getElementById('firstName').value;
+  const lastName = document.getElementById('lastName').value;
+  const phone = document.getElementById('tel').value;
+  const email = document.getElementById('email').value;
+  const province = document.getElementById('province').value;
+  const password = document.getElementById('password').value;
+  const confirm = document.getElementById('confirmPass').value;
+  const terms = document.getElementById('terms').checked;
+
+  // VALIDATION
+  if (password !== confirm) {
+    errorText.textContent = "Passwords do not match";
+    errorMsg.classList.add('show');
+    return;
+  }
+
+  if (!terms) {
+    errorText.textContent = "Accept terms first";
+    errorMsg.classList.add('show');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        phone,
+        email,
+        province,
+        password,
+        role: "admin" // 🔥 THIS IS THE KEY
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || "Signup failed");
+
+    // STEP UI
+    ['step1','step2','step3'].forEach(id => {
+      document.getElementById(id).classList.remove('active');
+      document.getElementById(id).classList.add('done');
+    });
+
+    // SUCCESS UI
+    document.getElementById('successOverlay').classList.add('show');
+
+    setTimeout(() => {
+      window.location.href = "dashboard-login.html";
+    }, 1500);
+
+  } catch (err) {
+    console.error("Admin signup error:", err);
+    errorText.textContent = err.message || "Server error";
+    errorMsg.classList.add('show');
+  }
+}
+</script>
+</body>
+</html>

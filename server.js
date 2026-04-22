@@ -1,10 +1,73 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// =======================
+// CONFIG
+// =======================
+const JWT_SECRET = process.env.JWT_SECRET || "TMMOTORS_SECRET_KEY_CHANGE_THIS";
+const MONGO_URI  = process.env.MONGO_URI  || "mongodb+srv://tmmotors:BigBenz%409chilo@cluster0.3yjpjxy.mongodb.net/tmmotors?retryWrites=true&w=majority";
+
+// =======================
+// CONNECT TO MONGODB
+// =======================
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => {
+        console.error('❌ MongoDB connection error:', err.message);
+        process.exit(1);
+    });
+
+// =======================
+// MONGOOSE SCHEMAS
+// =======================
+
+const carSchema = new mongoose.Schema({
+    make:        String,
+    model:       String,
+    year:        Number,
+    price:       Number,
+    mileage:     Number,
+    color:       String,
+    description: String,
+    image:       String,
+    status:      { type: String, default: 'available' },  // 'available' | 'sold'
+    soldDate:    String,
+    createdAt:   { type: String, default: () => new Date().toISOString() }
+});
+
+const userSchema = new mongoose.Schema({
+    firstName:  String,
+    lastName:   String,
+    phone:      String,
+    email:      { type: String, unique: true },
+    province:   String,
+    password:   String,
+    role:       { type: String, default: 'user' },  // 'user' | 'admin'
+    createdAt:  { type: String, default: () => new Date().toISOString() }
+});
+
+const enquirySchema = new mongoose.Schema({
+    name:      String,
+    phone:     String,
+    email:     String,
+    make:      String,
+    model:     String,
+    carId:     mongoose.Schema.Types.Mixed,
+    message:   String,
+    status:    { type: String, default: 'new' },  // 'new' | 'read' | 'replied'
+    createdAt: { type: String, default: () => new Date().toISOString() }
+});
+
+const Car     = mongoose.model('Car',     carSchema);
+const User    = mongoose.model('User',    userSchema);
+const Enquiry = mongoose.model('Enquiry', enquirySchema);
 
 // =======================
 // MIDDLEWARE
@@ -19,258 +82,321 @@ app.use((req, res, next) => {
 });
 
 // =======================
-// SERVE FRONTEND
+// PATHS
 // =======================
-const publicPath = path.join(__dirname, 'public');
-app.use(express.static(publicPath));
+const showroomPath = path.join(__dirname, 'public/showroom');
+const adminPath    = path.join(__dirname, 'admin');
 
 // =======================
-// SIMPLE JSON DATABASE
+// JWT HELPERS
 // =======================
-const DB_FILE = path.join(__dirname, 'db.json');
-
-// ensure db exists
-if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ cars: [], enquiries: [] }, null, 2));
-}
-
-function readDB() {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
-}
-
-function writeDB(data) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+function createToken(user) {
+    return jwt.sign(
+        { id: user._id, email: user.email, role: user.role },
+        JWT_SECRET,
+        { expiresIn: "7d" }
+    );
 }
 
 // =======================
-// ROUTES
+// AUTH MIDDLEWARE
 // =======================
+function auth(req, res, next) {
+    const header = req.headers.authorization;
+    if (!header) return res.status(401).json({ error: "No token provided" });
 
-// ROOT
-app.get('/', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
-});
+    const token = header.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Token missing" });
 
-// =======================
-// CARS
-// =======================
-
-// GET ALL CARS
-app.get('/api/cars', (req, res) => {
-    const db = readDB();
-    const cars = db.cars.filter(c => c.status === 'available');
-    res.json(cars);
-});
-
-// ADD CAR
-app.post('/api/cars', (req, res) => {
-    const db = readDB();
-
-    const newCar = {
-        id: Date.now(),
-        ...req.body,
-        status: 'available',
-        createdAt: new Date().toISOString()
-    };
-
-    db.cars.push(newCar);
-    writeDB(db);
-
-    res.json({ success: true, id: newCar.id });
-});
-
-// GET ONE CAR
-app.get('/api/cars/:id', (req, res) => {
-    const db = readDB();
-    const car = db.cars.find(c => c.id == req.params.id);
-
-    if (!car) return res.status(404).json({ error: "Not found" });
-
-    res.json(car);
-});
-
-// UPDATE CAR
-app.put('/api/cars/:id', (req, res) => {
-    const db = readDB();
-
-    const index = db.cars.findIndex(c => c.id == req.params.id);
-
-    if (index === -1) {
-        return res.status(404).json({ error: "Not found" });
+    try {
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: "Invalid or expired token" });
     }
+}
 
-    db.cars[index] = { ...db.cars[index], ...req.body };
+function adminOnly(req, res, next) {
+    if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+    if (req.user.role !== "admin") return res.status(403).json({ error: "Admin access required" });
+    next();
+}
 
-    writeDB(db);
+// =======================
+// AUTH ROUTES
+// =======================
 
-    res.json({ success: true });
+// SIGNUP
+app.post('/api/signup', async (req, res) => {
+    try {
+        const { firstName, lastName, phone, email, province, password, role } = req.body;
+
+        if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+        const exists = await User.findOne({ email });
+        if (exists) return res.status(400).json({ error: "User already exists" });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = new User({
+            firstName,
+            lastName,
+            phone,
+            email,
+            province,
+            password: hashedPassword,
+            role: role === "admin" ? "admin" : "user"
+        });
+
+        await user.save();
+        res.json({ success: true });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error during signup" });
+    }
 });
 
-// DELETE CAR
-app.delete('/api/cars/:id', (req, res) => {
-    const db = readDB();
+// LOGIN
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-    db.cars = db.cars.filter(c => c.id != req.params.id);
+        const user = await User.findOne({ email });
+        if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
-    writeDB(db);
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) return res.status(401).json({ error: "Invalid credentials" });
 
-    res.json({ success: true });
-});
+        const token = createToken(user);
 
-// SELL CAR
-app.post('/api/sell', (req, res) => {
-    const db = readDB();
+        res.json({
+            success: true,
+            token,
+            user: {
+                id:        user._id,
+                email:     user.email,
+                role:      user.role,
+                firstName: user.firstName || '',
+                lastName:  user.lastName  || '',
+                phone:     user.phone     || ''
+            }
+        });
 
-    const car = db.cars.find(c => c.id == req.body.id);
-    if (!car) return res.status(404).json({ error: "Not found" });
-
-    car.status = 'sold';
-    car.soldDate = new Date().toISOString();
-
-    writeDB(db);
-
-    res.json({ success: true });
-});
-
-// RESTORE CAR
-app.post('/api/restore', (req, res) => {
-    const db = readDB();
-
-    const car = db.cars.find(c => c.id == req.body.id);
-    if (!car) return res.status(404).json({ error: "Not found" });
-
-    car.status = 'available';
-    car.soldDate = null;
-
-    writeDB(db);
-
-    res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error during login" });
+    }
 });
 
 // =======================
-// ENQUIRIES
+// CAR ROUTES
 // =======================
 
-// ADD ENQUIRY
-app.post('/api/enquiries', (req, res) => {
-    const db = readDB();
-
-    const enquiry = {
-        id: Date.now(),
-        ...req.body,
-        status: 'new',
-        createdAt: new Date().toISOString()
-    };
-
-    db.enquiries.push(enquiry);
-    writeDB(db);
-
-    res.json({ success: true, id: enquiry.id });
+// GET all available cars
+app.get('/api/cars', auth, async (req, res) => {
+    try {
+        const cars = await Car.find({ status: 'available' }).sort({ createdAt: -1 });
+        // Map _id to id so frontend works unchanged
+        res.json(cars.map(c => ({ ...c.toObject(), id: c._id })));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch cars" });
+    }
 });
 
-// GET ENQUIRIES
-app.get('/api/enquiries', (req, res) => {
-    const db = readDB();
-    res.json(db.enquiries);
+// GET sold cars
+app.get('/api/sold', auth, async (req, res) => {
+    try {
+        const cars = await Car.find({ status: 'sold' }).sort({ soldDate: -1 });
+        res.json(cars.map(c => ({ ...c.toObject(), id: c._id })));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch sold cars" });
+    }
 });
 
-// DELETE ENQUIRY
-app.delete('/api/enquiries/:id', (req, res) => {
-    const db = readDB();
-
-    db.enquiries = db.enquiries.filter(e => e.id != req.params.id);
-
-    writeDB(db);
-
-    res.json({ success: true });
+// GET single car
+app.get('/api/cars/:id', auth, async (req, res) => {
+    try {
+        const car = await Car.findById(req.params.id);
+        if (!car) return res.status(404).json({ error: "Car not found" });
+        res.json({ ...car.toObject(), id: car._id });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch car" });
+    }
 });
 
-// MARK AS REPLIED
-app.put('/api/enquiries/:id/replied', (req, res) => {
-    const db = readDB();
+// ADD car
+app.post('/api/cars', auth, adminOnly, async (req, res) => {
+    try {
+        const car = new Car({
+            ...req.body,
+            status: 'available'
+        });
+        await car.save();
+        res.json({ success: true, id: car._id });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to add car" });
+    }
+});
 
-    const enquiry = db.enquiries.find(e => e.id == req.params.id);
-    if (!enquiry) return res.status(404).json({ error: "Not found" });
+// EDIT car
+app.put('/api/cars/:id', auth, adminOnly, async (req, res) => {
+    try {
+        const car = await Car.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!car) return res.status(404).json({ error: "Car not found" });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update car" });
+    }
+});
 
-    enquiry.status = 'replied';
-    enquiry.repliedAt = new Date().toISOString();
+// DELETE car
+app.delete('/api/cars/:id', auth, adminOnly, async (req, res) => {
+    try {
+        const car = await Car.findByIdAndDelete(req.params.id);
+        if (!car) return res.status(404).json({ error: "Car not found" });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to delete car" });
+    }
+});
 
-    writeDB(db);
+// SELL car
+app.post('/api/sell', auth, adminOnly, async (req, res) => {
+    try {
+        const car = await Car.findByIdAndUpdate(req.body.id, {
+            status: 'sold',
+            soldDate: new Date().toISOString()
+        }, { new: true });
+        if (!car) return res.status(404).json({ error: "Car not found" });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to mark as sold" });
+    }
+});
 
-    res.json({ success: true });
+// RESTORE car
+app.post('/api/restore', auth, adminOnly, async (req, res) => {
+    try {
+        const car = await Car.findByIdAndUpdate(req.body.id, {
+            status: 'available',
+            $unset: { soldDate: "" }
+        }, { new: true });
+        if (!car) return res.status(404).json({ error: "Car not found" });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to restore car" });
+    }
 });
 
 // =======================
-// ANALYTICS
+// ENQUIRY ROUTES
 // =======================
 
-app.get('/api/analytics/top-cars', (req, res) => {
-    const db = readDB();
+// GET all enquiries (admin)
+app.get('/api/enquiries', auth, async (req, res) => {
+    try {
+        const enquiries = await Enquiry.find().sort({ createdAt: -1 });
+        res.json(enquiries.map(e => ({ ...e.toObject(), id: e._id })));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch enquiries" });
+    }
+});
 
-    const stats = {};
+// GET single enquiry
+app.get('/api/enquiries/:id', auth, async (req, res) => {
+    try {
+        const e = await Enquiry.findById(req.params.id);
+        if (!e) return res.status(404).json({ error: "Not found" });
+        res.json({ ...e.toObject(), id: e._id });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch enquiry" });
+    }
+});
 
-    db.enquiries.forEach(e => {
-        if (e.carId) {
-            stats[e.carId] = (stats[e.carId] || 0) + 1;
+// POST new enquiry (authenticated customers)
+app.post('/api/enquiries', auth, async (req, res) => {
+    try {
+        const enquiry = new Enquiry({
+            ...req.body,
+            status: 'new'
+        });
+        await enquiry.save();
+        res.json({ success: true, id: enquiry._id });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to save enquiry" });
+    }
+});
+
+// MARK as read
+app.put('/api/enquiries/:id/read', auth, async (req, res) => {
+    try {
+        const e = await Enquiry.findById(req.params.id);
+        if (!e) return res.status(404).json({ error: "Not found" });
+        if (e.status === 'new') {
+            e.status = 'read';
+            await e.save();
         }
-    });
-
-    const result = Object.keys(stats).map(id => {
-        const car = db.cars.find(c => c.id == id);
-        return {
-            id,
-            make: car?.make,
-            model: car?.model,
-            total: stats[id]
-        };
-    });
-
-    res.json(result.sort((a, b) => b.total - a.total).slice(0, 5));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update enquiry" });
+    }
 });
 
-app.get('/api/analytics/enquiries-per-day', (req, res) => {
-    const db = readDB();
-
-    const map = {};
-
-    db.enquiries.forEach(e => {
-        const date = new Date(e.createdAt).toISOString().split('T')[0];
-        map[date] = (map[date] || 0) + 1;
-    });
-
-    const result = Object.keys(map).map(date => ({
-        date,
-        total: map[date]
-    }));
-
-    res.json(result);
+// MARK as replied
+app.put('/api/enquiries/:id/replied', auth, async (req, res) => {
+    try {
+        const e = await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied' }, { new: true });
+        if (!e) return res.status(404).json({ error: "Not found" });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update enquiry" });
+    }
 });
 
-app.get('/api/analytics/conversion', (req, res) => {
-    const db = readDB();
-
-    const enquiries = db.enquiries.length;
-    const sold = db.cars.filter(c => c.status === 'sold').length;
-
-    const rate = enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0;
-
-    res.json({
-        enquiries,
-        sold,
-        conversionRate: rate
-    });
+// DELETE enquiry
+app.delete('/api/enquiries/:id', auth, async (req, res) => {
+    try {
+        const e = await Enquiry.findByIdAndDelete(req.params.id);
+        if (!e) return res.status(404).json({ error: "Not found" });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to delete enquiry" });
+    }
 });
 
 // =======================
-// 404
+// STATIC FILES
+// =======================
+app.use('/admin', express.static(adminPath));
+app.use(express.static(showroomPath));
+
+// =======================
+// HOME
+// =======================
+app.get('/', (req, res) => {
+    res.sendFile(path.join(showroomPath, 'index.html'));
+});
+
+// =======================
+// DEBUG
+// =======================
+app.get('/test-token', (req, res) => {
+    res.json({ message: "Server OK", db: mongoose.connection.readyState === 1 ? "connected" : "disconnected" });
+});
+
+// =======================
+// 404 — must be LAST
 // =======================
 app.use((req, res) => {
-    res.status(404).json({ error: "Route not found" });
+    res.status(404).send("Page not found");
 });
 
 // =======================
-// START SERVER
+// START
 // =======================
 app.listen(PORT, () => {
-    console.log(`🚗 Server running on port ${PORT}`);
+    console.log(`🚗 T&M Motors server running on port ${PORT}`);
 });

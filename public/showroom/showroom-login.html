@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>T&M Motors — Showroom Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700;800&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --gold: #F5B800;
+    --gold-light: #FFD84D;
+    --gold-dim: #A67C00;
+    --gold-glow: rgba(245,184,0,0.18);
+    --dark: #0D0F12;
+    --dark-2: #13161A;
+    --dark-3: #1A1E24;
+    --dark-4: #22272F;
+    --dark-5: #2C3340;
+    --text: #E8E4D9;
+    --text-muted: #7A8090;
+    --text-dim: #4A5060;
+    --border: rgba(245,184,0,0.12);
+    --border-bright: rgba(245,184,0,0.35);
+    --danger: #E05555;
+    --success: #4CAF82;
+    --radius: 12px;
+    --radius-lg: 20px;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Montserrat', sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  /* ===== HERO LEFT PANEL ===== */
+  .hero-panel {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 60px;
+    overflow: hidden;
+    background: var(--dark-2);
+  }
+
+  /* Geometric art deco pattern */
+  .hero-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        -45deg, transparent, transparent 40px,
+        rgba(245,184,0,0.03) 40px, rgba(245,184,0,0.03) 41px
+      ),
+      repeating-linear-gradient(
+        45deg, transparent, transparent 40px,
+        rgba(245,184,0,0.02) 40px, rgba(245,184,0,0.02) 41px
+      );
+  }
+
+  /* Gold radial orb top right */
+  .hero-panel::after {
+    content: '';
+    position: absolute;
+    top: -150px;
+    right: -150px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(245,184,0,0.12) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Decorative rings */
+  .deco-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    animation: ringPulse 4s ease-in-out infinite;
+  }
+
+  .ring-1 { width: 300px; height: 300px; top: 10%; right: 5%; animation-delay: 0s; }
+  .ring-2 { width: 450px; height: 450px; top: 0%; right: -10%; animation-delay: 0.7s; border-color: rgba(245,184,0,0.06); }
+  .ring-3 { width: 200px; height: 200px; top: 20%; right: 15%; animation-delay: 1.4s; border-color: rgba(245,184,0,0.08); }
+
+  @keyframes ringPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.03); opacity: 0.6; }
+  }
+
+  .hero-logo-wrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -60%);
+    text-align: center;
+    z-index: 2;
+    animation: logoIn 1s cubic-bezier(0.4,0,0.2,1) both;
+  }
+
+  @keyframes logoIn {
+    from { opacity: 0; transform: translate(-50%, -55%) scale(0.9); }
+    to { opacity: 1; transform: translate(-50%, -60%) scale(1); }
+  }
+
+  .hero-logo-wrap img {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 50px rgba(245,184,0,0.5));
+    animation: logoFloat 5s ease-in-out infinite;
+  }
+
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 3;
+    animation: heroContentIn 0.8s cubic-bezier(0.4,0,0.2,1) 0.3s both;
+  }
+
+  @keyframes heroContentIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero-label {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .hero-label::before {
+    content: '';
+    width: 30px;
+    height: 1px;
+    background: var(--gold);
+  }
+
+  .hero-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.05;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  .hero-title span { color: var(--gold); }
+
+  .hero-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    max-width: 380px;
+    margin-bottom: 36px;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 36px;
+  }
+
+  .hero-stat { text-align: left; }
+
+  .hero-stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .hero-stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .hero-divider {
+    width: 1px;
+    height: 40px;
+    background: var(--border-bright);
+    align-self: center;
+  }
+
+  /* ===== FORM PANEL ===== */
+  .form-panel {
+    width: 480px;
+    flex-shrink: 0;
+    background: var(--dark);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px 52px;
+    position: relative;
+    z-index: 1;
+    animation: formIn 0.7s cubic-bezier(0.4,0,0.2,1) 0.15s both;
+  }
+
+  @keyframes formIn {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Mobile logo (hidden on desktop) */
+  .mobile-logo { display: none; }
+
+  .form-header { margin-bottom: 40px; }
+
+  .form-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gold-glow);
+    border: 1px solid var(--border-bright);
+    color: var(--gold);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+
+  .form-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+    animation: blink 2s ease infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .form-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+
+  .form-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .form-group { margin-bottom: 20px; }
+
+  .form-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .input-wrap { position: relative; }
+
+  .input-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 15px;
+    pointer-events: none;
+    transition: var(--transition);
+  }
+
+  .form-input {
+    width: 100%;
+    background: var(--dark-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 14px 14px 44px;
+    color: var(--text);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: var(--transition);
+  }
+
+  .form-input::placeholder { color: var(--text-dim); }
+
+  .form-input:focus {
+    border-color: var(--gold);
+    background: var(--dark-4);
+    box-shadow: 0 0 0 3px var(--gold-glow);
+  }
+
+  .input-wrap:focus-within .input-icon { color: var(--gold); }
+
+  .pass-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 4px;
+    transition: var(--transition);
+  }
+
+  .pass-toggle:hover { color: var(--gold); }
+  .pass-input { padding-right: 42px; }
+
+  .form-extras {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .remember-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+    user-select: none;
+  }
+
+  .remember-label input { display: none; }
+
+  .custom-check {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border-bright);
+    background: var(--dark-3);
+    display: flex; align-items: center; justify-content: center;
+    transition: var(--transition);
+    flex-shrink: 0;
+  }
+
+  .remember-label input:checked ~ .custom-check {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+
+  .custom-check::after {
+    content: '✓';
+    font-size: 11px;
+    color: var(--dark);
+    font-weight: 700;
+    opacity: 0;
+    transition: var(--transition);
+  }
+
+  .remember-label input:checked ~ .custom-check::after { opacity: 1; }
+
+  .forgot-link {
+    font-size: 12px;
+    color: var(--gold);
+    text-decoration: none;
+    font-weight: 500;
+    transition: var(--transition);
+  }
+
+  .forgot-link:hover { color: var(--gold-light); }
+
+  .btn-primary {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+    color: var(--dark);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(245,184,0,0.25);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(245,184,0,0.4);
+  }
+
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-shine {
+    position: absolute;
+    top: -50%; left: -75%;
+    width: 50%; height: 200%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    transform: skewX(-20deg);
+    transition: 0.6s ease;
+  }
+
+  .btn-primary:hover .btn-shine { left: 125%; }
+
+  .form-divider {
+    display: flex; align-items: center; gap: 14px;
+    margin: 26px 0;
+  }
+
+  .form-divider::before,
+  .form-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .form-divider span { font-size: 11px; color: var(--text-dim); letter-spacing: 0.08em; }
+
+  .form-footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .form-footer a { color: var(--gold); font-weight: 600; text-decoration: none; }
+  .form-footer a:hover { color: var(--gold-light); }
+
+  .form-footer + .form-footer { margin-top: 12px; }
+
+  .error-msg {
+    background: rgba(224,85,85,0.1);
+    border: 1px solid rgba(224,85,85,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--danger);
+    margin-bottom: 18px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .error-msg.show { display: flex; }
+
+  .success-overlay {
+    position: fixed; inset: 0;
+    background: rgba(13,15,18,0.92);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999;
+    opacity: 0; pointer-events: none;
+    transition: 0.4s ease;
+  }
+
+  .success-overlay.show { opacity: 1; pointer-events: all; }
+
+  .success-icon {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: rgba(76,175,130,0.15);
+    border: 2px solid var(--success);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; color: var(--success);
+    margin-bottom: 20px;
+    animation: successPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }
+
+  @keyframes successPop {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .success-overlay h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; color: var(--text); margin-bottom: 8px;
+  }
+
+  .success-overlay p { font-size: 13px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- Hero Left -->
+<div class="hero-panel">
+  <div class="deco-ring ring-1"></div>
+  <div class="deco-ring ring-2"></div>
+  <div class="deco-ring ring-3"></div>
+
+  <div class="hero-logo-wrap">
+    <img src="123456.png" alt="T&M Motors" onerror="this.outerHTML='<div style=\'width:160px;height:160px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:700;color:var(--dark);font-family:Cormorant Garamond,serif;\'>T&M</div>'"/>
+  </div>
+
+  <div class="hero-content">
+    <div class="hero-label">T&M Motors Showroom</div>
+    <div class="hero-title">Discover<br/>Your Next<br/><span>Dream Car</span></div>
+    <div class="hero-sub">Browse our exclusive collection of luxury and performance vehicles. Sign in to save favourites, track enquiries, and book test drives.</div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num">150+</div>
+        <div class="hero-stat-label">Cars in Stock</div>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">10+</div>
+        <div class="hero-stat-label">Brands</div>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">5★</div>
+        <div class="hero-stat-label">Service</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Form Right -->
+<div class="form-panel">
+  <div class="form-header">
+    <div class="form-badge">Showroom Portal</div>
+    <div class="form-title">Welcome<br/>Back</div>
+    <div class="form-subtitle">Sign in to explore T&M Motors' exclusive inventory and manage your enquiries.</div>
+  </div>
+
+  <div class="error-msg" id="errorMsg">
+    ⚠️ <span id="errorText">Invalid credentials. Please try again.</span>
+  </div>
+
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label class="form-label">Email Address</label>
+      <div class="input-wrap">
+        <input type="email" class="form-input" id="email" placeholder="you@example.com" required/>
+        <span class="input-icon">✉</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="input-wrap">
+        <input type="password" class="form-input pass-input" id="password" placeholder="Your password" required/>
+        <span class="input-icon">🔒</span>
+        <button type="button" class="pass-toggle" onclick="togglePass('password', this)">👁</button>
+      </div>
+    </div>
+
+    <div class="form-extras">
+      <label class="remember-label">
+        <input type="checkbox"/>
+        <div class="custom-check"></div>
+        Remember me
+      </label>
+      <a href="#" class="forgot-link">Forgot password?</a>
+    </div>
+
+    <button type="submit" class="btn-primary">
+      <span class="btn-shine"></span>
+      Sign In to Showroom
+    </button>
+  </form>
+
+  <div class="form-divider"><span>New here?</span></div>
+
+  <div class="form-footer">
+    <a href="showroom-signup.html">Create a free account →</a>
+  </div>
+
+  <div class="form-footer" style="margin-top:14px;">
+    Staff? <a href="dashboard-login.html">Go to admin dashboard →</a>
+  </div>
+</div>
+
+<div class="success-overlay" id="successOverlay">
+  <div class="success-icon">✓</div>
+  <h3>Welcome Back!</h3>
+  <p>Loading the showroom for you…</p>
+</div>
+
+<script>
+  function togglePass(id, btn) {
+    const input = document.getElementById(id);
+    input.type = input.type === 'password' ? 'text' : 'password';
+    btn.textContent = input.type === 'password' ? '👁' : '🙈';
+  }
+
+  // =========================
+// FIXED LOGIN (ROBUST + DEBUG SAFE)
+// =========================
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const errorMsg = document.getElementById('errorMsg');
+  const errorText = document.getElementById('errorText');
+  const successOverlay = document.getElementById('successOverlay');
+
+  errorMsg.classList.remove('show');
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!email || !password) {
+    errorText.textContent = "Please enter email and password";
+    errorMsg.classList.add('show');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    console.log("LOGIN RESPONSE:", data); // 🔥 DEBUG LINE
+
+    if (!res.ok) {
+      throw new Error(data.error || "Login failed");
+    }
+
+    // =========================
+    // SAVE AUTH DATA
+    // =========================
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+
+    // =========================
+    // SUCCESS UI
+    // =========================
+    successOverlay.classList.add('show');
+
+    setTimeout(() => {
+      window.location.href = 'index.html'; // showroom home
+    }, 1200);
+
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+
+    errorText.textContent =
+      err.message.includes("fetch")
+        ? "Cannot connect to server. Is backend running?"
+        : err.message;
+
+    errorMsg.classList.add('show');
+  }
+}
+</script>
+</body>
+</html>

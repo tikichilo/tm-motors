@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 // =======================
 // CONFIG
 // =======================
-const JWT_SECRET = process.env.JWT_SECRET || "TMMOTORS_SECRET_KEY_CHANGE_THIS";
+const JWT_SECRET = process.env.JWT_SECRET || "tmmotors_super_secret_2026_10178";
 const MONGO_URI  = process.env.MONGO_URI  || "mongodb+srv://tmmotors:BigBenz%409chilo@cluster0.3yjpjxy.mongodb.net/tmmotors?retryWrites=true&w=majority";
 
 // =======================
@@ -376,7 +376,21 @@ app.use(express.static(showroomPath));
 // =======================
 // HOME
 // =======================
+// HOME — redirect to login
 app.get('/', (req, res) => {
+    res.sendFile(path.join(showroomPath, 'showroom-signup.html'));
+});
+
+// NAMED PAGE ROUTES
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(showroomPath, 'showroom-login.html'));
+});
+
+app.get('/signup', (req, res) => {
+    res.sendFile(path.join(showroomPath, 'showroom-signup.html'));
+});
+
+app.get('/showroom', (req, res) => {
     res.sendFile(path.join(showroomPath, 'index.html'));
 });
 

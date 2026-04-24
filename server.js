@@ -1,234 +1,296 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const JWT_SECRET = process.env.JWT_SECRET || "tmmotors_super_secret_2026_10178";
-const MONGO_URI  = process.env.MONGO_URI  || "mongodb+srv://tmmotors:BigBenz%409chilo@cluster0.3yjpjxy.mongodb.net/tmmotors?retryWrites=true&w=majority";
+if (!process.env.MONGO_URI) {
+    console.error("❌ Missing MONGO_URI");
+    process.exit(1);
+}
 
-mongoose.connect(MONGO_URI)
+// Increase body limit for base64 image uploads (10 images)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cors({ origin: "*", credentials: false }));
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }));
+app.use(morgan('dev'));
+
+mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ MongoDB connected'))
     .catch(err => { console.error('❌ MongoDB error:', err.message); process.exit(1); });
 
+// =======================
+// SCHEMAS
+// =======================
 const carSchema = new mongoose.Schema({
-    make: String, model: String, year: Number, price: Number,
-    mileage: Number, color: String, description: String, image: String,
-    status: { type: String, default: 'available' },
-    soldDate: String,
-    createdAt: { type: String, default: () => new Date().toISOString() }
-});
-
-const userSchema = new mongoose.Schema({
-    firstName: String, lastName: String, phone: String,
-    email: { type: String, unique: true },
-    province: String, password: String,
-    role: { type: String, default: 'user' },
-    createdAt: { type: String, default: () => new Date().toISOString() }
+    make:        { type: String, required: true },
+    model:       { type: String, required: true },
+    year:        Number,
+    price:       { type: Number, required: true },
+    mileage:     Number,
+    color:       String,
+    description: String,
+    image:       String,          // primary image (backward compat)
+    images:      [String],        // up to 10 images (base64 or URL)
+    status:      { type: String, default: 'available' },
+    soldDate:    String,
+    createdAt:   { type: String, default: () => new Date().toISOString() }
 });
 
 const enquirySchema = new mongoose.Schema({
-    name: String, phone: String, email: String,
-    make: String, model: String,
-    carId: mongoose.Schema.Types.Mixed,
-    message: String,
-    status: { type: String, default: 'new' },
+    carId:     { type: String, default: null },
+    carMake:   String,
+    carModel:  String,
+    carYear:   Number,
+    name:      { type: String, required: true },
+    phone:     String,
+    email:     String,
+    message:   String,
+    status:    { type: String, default: 'new' },
+    repliedAt: String,
     createdAt: { type: String, default: () => new Date().toISOString() }
 });
 
-const Car     = mongoose.model('Car',     carSchema);
-const User    = mongoose.model('User',    userSchema);
+const Car     = mongoose.model('Car', carSchema);
 const Enquiry = mongoose.model('Enquiry', enquirySchema);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cors());
-app.use((req, res, next) => { console.log(`📡 ${req.method} ${req.url}`); next(); });
-
-const showroomPath = path.join(__dirname, 'public/showroom');
-const adminPath    = path.join(__dirname, 'admin');
-
-function createToken(user) {
-    return jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+function carOut(c) {
+    const obj = c.toObject();
+    obj.id = obj._id.toString();
+    if (!obj.images || !obj.images.length) {
+        obj.images = obj.image ? [obj.image] : [];
+    }
+    return obj;
 }
 
-function auth(req, res, next) {
-    const header = req.headers.authorization;
-    if (!header) return res.status(401).json({ error: "No token provided" });
-    const token = header.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Token missing" });
-    try { req.user = jwt.verify(token, JWT_SECRET); next(); }
-    catch (err) { return res.status(401).json({ error: "Invalid or expired token" }); }
+function enqOut(e) {
+    const obj = e.toObject();
+    obj.id = obj._id.toString();
+    return obj;
 }
 
-function adminOnly(req, res, next) {
-    if (!req.user) return res.status(401).json({ error: "Not authenticated" });
-    if (req.user.role !== "admin") return res.status(403).json({ error: "Admin access required" });
-    next();
-}
-
-// ========= PAGE ROUTES — BEFORE static =========
-app.get('/', (req, res) => res.sendFile(path.join(showroomPath, 'showroom-signup.html')));
-app.get('/login', (req, res) => res.sendFile(path.join(showroomPath, 'showroom-login.html')));
-app.get('/signup', (req, res) => res.sendFile(path.join(showroomPath, 'showroom-signup.html')));
-app.get('/showroom', (req, res) => res.sendFile(path.join(showroomPath, 'index.html')));
-app.get('/admin/login', (req, res) => res.sendFile(path.join(adminPath, 'dashboard-login.html')));
-app.get('/admin/signup', (req, res) => res.sendFile(path.join(adminPath, 'dashboard-signup.html')));
-app.get('/admin/dashboard', (req, res) => res.sendFile(path.join(adminPath, 'dashboard.html')));
-app.get('/admin/enquiries', (req, res) => res.sendFile(path.join(adminPath, 'que.html')));
-
-// ========= AUTH ROUTES =========
-app.post('/api/signup', async (req, res) => {
-    try {
-        const { firstName, lastName, phone, email, province, password, role } = req.body;
-        if (!email || !password) return res.status(400).json({ error: "Email and password required" });
-        const exists = await User.findOne({ email });
-        if (exists) return res.status(400).json({ error: "User already exists" });
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ firstName, lastName, phone, email, province, password: hashedPassword, role: role === "admin" ? "admin" : "user" });
-        await user.save();
-        res.json({ success: true });
-    } catch (err) { console.error(err); res.status(500).json({ error: "Server error during signup" }); }
-});
-
-app.post('/api/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const user = await User.findOne({ email });
-        if (!user) return res.status(401).json({ error: "Invalid credentials" });
-        const match = await bcrypt.compare(password, user.password);
-        if (!match) return res.status(401).json({ error: "Invalid credentials" });
-        const token = createToken(user);
-        res.json({ success: true, token, user: { id: user._id, email: user.email, role: user.role, firstName: user.firstName || '', lastName: user.lastName || '', phone: user.phone || '' } });
-    } catch (err) { console.error(err); res.status(500).json({ error: "Server error during login" }); }
-});
-
-// ========= CAR ROUTES =========
-app.get('/api/cars', auth, async (req, res) => {
+// =======================
+// CAR ROUTES
+// =======================
+app.get('/api/cars', async (req, res) => {
     try {
         const cars = await Car.find({ status: 'available' }).sort({ createdAt: -1 });
-        res.json(cars.map(c => ({ ...c.toObject(), id: c._id })));
-    } catch (err) { res.status(500).json({ error: "Failed to fetch cars" }); }
+        res.json(cars.map(carOut));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch cars" });
+    }
 });
 
-app.get('/api/sold', auth, async (req, res) => {
-    try {
-        const cars = await Car.find({ status: 'sold' }).sort({ soldDate: -1 });
-        res.json(cars.map(c => ({ ...c.toObject(), id: c._id })));
-    } catch (err) { res.status(500).json({ error: "Failed to fetch sold cars" }); }
-});
-
-app.get('/api/cars/:id', auth, async (req, res) => {
+app.get('/api/cars/:id', async (req, res) => {
     try {
         const car = await Car.findById(req.params.id);
-        if (!car) return res.status(404).json({ error: "Car not found" });
-        res.json({ ...car.toObject(), id: car._id });
-    } catch (err) { res.status(500).json({ error: "Failed to fetch car" }); }
+        if (!car) return res.status(404).json({ error: "Not found" });
+        res.json(carOut(car));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch car" });
+    }
 });
 
-app.post('/api/cars', auth, adminOnly, async (req, res) => {
+app.post('/api/cars', async (req, res) => {
     try {
-        const car = new Car({ ...req.body, status: 'available' });
-        await car.save();
-        res.json({ success: true, id: car._id });
-    } catch (err) { console.error(err); res.status(500).json({ error: "Failed to add car" }); }
+        const { make, model, year, price, mileage, color, description, image, images } = req.body;
+        if (!make || !model || !price) return res.status(400).json({ error: "Make, model, price required" });
+
+        let imgs = [];
+        if (Array.isArray(images) && images.length) imgs = images.slice(0, 10);
+        else if (image) imgs = [image];
+
+        const car = await new Car({
+            make: make.trim(), model: model.trim(),
+            year: year ? Number(year) : null,
+            price: Number(price),
+            mileage: mileage ? Number(mileage) : null,
+            color: color || null, description: description || null,
+            image: imgs[0] || null, images: imgs
+        }).save();
+
+        res.status(201).json({ success: true, ...carOut(car) });
+    } catch (err) {
+        console.error('❌ ADD CAR:', err.message);
+        res.status(500).json({ error: "Failed to add car" });
+    }
 });
 
-app.put('/api/cars/:id', auth, adminOnly, async (req, res) => {
+app.put('/api/cars/:id', async (req, res) => {
     try {
-        const car = await Car.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!car) return res.status(404).json({ error: "Car not found" });
+        const { make, model, year, price, mileage, color, description, image, images } = req.body;
+        let imgs = [];
+        if (Array.isArray(images) && images.length) imgs = images.slice(0, 10);
+        else if (image) imgs = [image];
+
+        await Car.findByIdAndUpdate(req.params.id, {
+            make, model,
+            year: year ? Number(year) : null,
+            price: Number(price),
+            mileage: mileage ? Number(mileage) : null,
+            color, description,
+            image: imgs[0] || null,
+            images: imgs
+        });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to update car" }); }
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update car" });
+    }
 });
 
-app.delete('/api/cars/:id', auth, adminOnly, async (req, res) => {
+app.delete('/api/cars/:id', async (req, res) => {
     try {
-        const car = await Car.findByIdAndDelete(req.params.id);
-        if (!car) return res.status(404).json({ error: "Car not found" });
+        await Car.findByIdAndDelete(req.params.id);
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to delete car" }); }
+    } catch (err) {
+        res.status(500).json({ error: "Failed to delete car" });
+    }
 });
 
-app.post('/api/sell', auth, adminOnly, async (req, res) => {
+app.post('/api/sell', async (req, res) => {
     try {
-        const car = await Car.findByIdAndUpdate(req.body.id, { status: 'sold', soldDate: new Date().toISOString() }, { new: true });
-        if (!car) return res.status(404).json({ error: "Car not found" });
+        await Car.findByIdAndUpdate(req.body.id, { status: 'sold', soldDate: new Date().toISOString() });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to mark as sold" }); }
+    } catch (err) {
+        res.status(500).json({ error: "Failed to sell car" });
+    }
 });
 
-app.post('/api/restore', auth, adminOnly, async (req, res) => {
+app.get('/api/sold', async (req, res) => {
     try {
-        const car = await Car.findByIdAndUpdate(req.body.id, { status: 'available', $unset: { soldDate: "" } }, { new: true });
-        if (!car) return res.status(404).json({ error: "Car not found" });
+        const sold = await Car.find({ status: 'sold' }).sort({ soldDate: -1 });
+        res.json(sold.map(carOut));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch sold cars" });
+    }
+});
+
+app.post('/api/restore', async (req, res) => {
+    try {
+        await Car.findByIdAndUpdate(req.body.id, { status: 'available', soldDate: null });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to restore car" }); }
+    } catch (err) {
+        res.status(500).json({ error: "Restore failed" });
+    }
 });
 
-// ========= ENQUIRY ROUTES =========
-app.get('/api/enquiries', auth, async (req, res) => {
+// =======================
+// ENQUIRY ROUTES
+// =======================
+app.post('/api/enquiries', async (req, res) => {
     try {
-        const enquiries = await Enquiry.find().sort({ createdAt: -1 });
-        res.json(enquiries.map(e => ({ ...e.toObject(), id: e._id })));
-    } catch (err) { res.status(500).json({ error: "Failed to fetch enquiries" }); }
-});
+        const { carId, carMake, carModel, carYear, name, phone, email, message } = req.body;
+        if (!name) return res.status(400).json({ error: "Name is required" });
 
-app.get('/api/enquiries/:id', auth, async (req, res) => {
-    try {
-        const e = await Enquiry.findById(req.params.id);
-        if (!e) return res.status(404).json({ error: "Not found" });
-        res.json({ ...e.toObject(), id: e._id });
-    } catch (err) { res.status(500).json({ error: "Failed to fetch enquiry" }); }
-});
+        const enquiry = await new Enquiry({
+            carId: carId || null, carMake: carMake || null,
+            carModel: carModel || null, carYear: carYear || null,
+            name, phone: phone || null, email: email || null,
+            message: message || null, status: 'new'
+        }).save();
 
-app.post('/api/enquiries', auth, async (req, res) => {
-    try {
-        const enquiry = new Enquiry({ ...req.body, status: 'new' });
-        await enquiry.save();
         res.json({ success: true, id: enquiry._id });
-    } catch (err) { console.error(err); res.status(500).json({ error: "Failed to save enquiry" }); }
+    } catch (err) {
+        console.error('❌ ENQUIRY:', err.message);
+        res.status(500).json({ error: "Failed to submit enquiry" });
+    }
 });
 
-app.put('/api/enquiries/:id/read', auth, async (req, res) => {
+app.get('/api/enquiries', async (req, res) => {
+    try {
+        const data = await Enquiry.find().sort({ createdAt: -1 });
+        res.json(data.map(enqOut));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch enquiries" });
+    }
+});
+
+app.get('/api/enquiries/:id', async (req, res) => {
     try {
         const e = await Enquiry.findById(req.params.id);
         if (!e) return res.status(404).json({ error: "Not found" });
-        if (e.status === 'new') { e.status = 'read'; await e.save(); }
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to update enquiry" }); }
+        res.json(enqOut(e));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch enquiry" });
+    }
 });
 
-app.put('/api/enquiries/:id/replied', auth, async (req, res) => {
+app.put('/api/enquiries/:id/replied', async (req, res) => {
     try {
-        const e = await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied' }, { new: true });
-        if (!e) return res.status(404).json({ error: "Not found" });
+        await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied', repliedAt: new Date().toISOString() });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to update enquiry" }); }
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update enquiry" });
+    }
 });
 
-app.delete('/api/enquiries/:id', auth, async (req, res) => {
+app.delete('/api/enquiries/:id', async (req, res) => {
     try {
-        const e = await Enquiry.findByIdAndDelete(req.params.id);
-        if (!e) return res.status(404).json({ error: "Not found" });
+        await Enquiry.findByIdAndDelete(req.params.id);
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to delete enquiry" }); }
+    } catch (err) {
+        res.status(500).json({ error: "Failed to delete enquiry" });
+    }
 });
 
-// ========= STATIC FILES — after page routes =========
-app.use('/admin', express.static(adminPath));
-app.use(express.static(showroomPath));
-
-// ========= DEBUG =========
-app.get('/test-token', (req, res) => {
-    res.json({ message: "Server OK", db: mongoose.connection.readyState === 1 ? "connected" : "disconnected" });
+// =======================
+// ANALYTICS
+// =======================
+app.get('/api/analytics/enquiries-per-day', async (req, res) => {
+    try {
+        const data = await Enquiry.aggregate([
+            { $group: { _id: { $substr: ["$createdAt", 0, 10] }, total: { $sum: 1 } } },
+            { $sort: { _id: 1 } },
+            { $project: { date: "$_id", total: 1, _id: 0 } }
+        ]);
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: "Analytics failed" });
+    }
 });
 
-// ========= 404 — must be LAST =========
-app.use((req, res) => res.status(404).send("Page not found"));
+app.get('/api/analytics/top-cars', async (req, res) => {
+    try {
+        const data = await Enquiry.aggregate([
+            { $group: { _id: "$carId", make: { $first: "$carMake" }, model: { $first: "$carModel" }, total: { $sum: 1 } } },
+            { $sort: { total: -1 } }, { $limit: 5 }
+        ]);
+        res.json(data.map(d => ({ id: d._id, make: d.make || '?', model: d.model || '?', total: d.total })));
+    } catch (err) {
+        res.status(500).json({ error: "Analytics failed" });
+    }
+});
 
-app.listen(PORT, () => console.log(`🚗 T&M Motors server running on port ${PORT}`));
+app.get('/api/analytics/conversion', async (req, res) => {
+    try {
+        const enquiries = await Enquiry.countDocuments();
+        const sold      = await Car.countDocuments({ status: 'sold' });
+        res.json({ enquiries, sold, conversionRate: enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0 });
+    } catch (err) {
+        res.status(500).json({ error: "Analytics failed" });
+    }
+});
+
+// =======================
+// STATIC + ROUTES
+// =======================
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/admin', express.static(path.join(__dirname, 'admin')));
+
+app.get('/', (req, res) => {
+    const f = path.join(__dirname, 'index.html');
+    res.sendFile(f, err => { if (err) res.json({ status: "T&M Motors API running" }); });
+});
+
+app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.url} not found` }));
+
+app.listen(PORT, () => console.log(`🚗 T&M Motors running on http://localhost:${PORT}`));

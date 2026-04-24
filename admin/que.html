@@ -330,24 +330,6 @@ let currentSearch = '';
 let activeEnquiry = null;
 
 // ==============================
-// 🔐 AUTH HELPERS (NEW)
-// ==============================
-function getToken() {
-  return localStorage.getItem('token');
-}
-
-async function apiFetch(url, options = {}) {
-  return fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + getToken(),
-      ...(options.headers || {})
-    }
-  });
-}
-
-// ==============================
 // STATUS HELPERS
 // ==============================
 function getStatus(id){ return statuses[id] || 'new'; }
@@ -359,15 +341,11 @@ function setStatus(id, s){ statuses[id] = s; }
 async function loadEnquiries(){
   const tbody = document.getElementById('q-tbody');
 
-  tbody.innerHTML = `
-    <tr><td colspan="8">
-      <div class="loading">Loading queries...</div>
-    </td></tr>
-  `;
+  tbody.innerHTML = `<tr><td colspan="8"><div class="loading">Loading queries...</div></td></tr>`;
 
   try {
-    const res = await apiFetch(`${API}/enquiries`);
-    if(!res.ok) throw new Error(`Server ${res.status}`);
+    const res = await fetch(`${API}/enquiries`);
+    if(!res.ok) throw new Error();
 
     const data = await res.json();
     allEnquiries = Array.isArray(data) ? data : [];
@@ -382,9 +360,7 @@ async function loadEnquiries(){
       <tr><td colspan="8">
         <div class="empty-state">
           <div class="empty-icon">⚠️</div>
-          <p style="color:var(--danger)">
-            Could not connect to server.
-          </p>
+          <p style="color:var(--danger)">Could not connect to server.</p>
         </div>
       </td></tr>
     `;
@@ -405,8 +381,7 @@ function updateStats(){
   const today = allEnquiries.filter(e => {
     if(!e.createdAt) return false;
     const d = new Date(e.createdAt);
-    const t = new Date();
-    return d.toDateString() === t.toDateString();
+    return d.toDateString() === new Date().toDateString();
   }).length;
 
   document.getElementById('s-total').textContent = total;
@@ -439,13 +414,7 @@ function renderTable(){
   }
 
   if(!data.length){
-    tbody.innerHTML = `
-      <tr><td colspan="8">
-        <div class="empty-state">
-          <div class="empty-icon">📭</div>
-          <p>No queries found</p>
-        </div>
-      </td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">📭 No queries found</div></td></tr>`;
     return;
   }
 
@@ -457,11 +426,7 @@ function renderTable(){
       ? `${e.make || ''} ${e.model || ''}`.trim()
       : '<span style="color:var(--text-dim)">General</span>';
 
-    const contact = e.phone 
-      ? e.phone 
-      : e.email 
-      ? e.email 
-      : '<span style="color:var(--text-dim)">—</span>';
+    const contact = e.phone || e.email || '<span style="color:var(--text-dim)">—</span>';
 
     const date = e.createdAt
       ? new Date(e.createdAt).toLocaleDateString('en-GB',{
@@ -479,18 +444,16 @@ function renderTable(){
     return `
     <tr>
       <td>#${e.id}</td>
-      <td class="name">${e.name || '—'}</td>
+      <td>${e.name || '—'}</td>
       <td>${contact}</td>
-      <td class="car">${car}</td>
-      <td class="msg">${e.message || '—'}</td>
+      <td>${car}</td>
+      <td>${e.message || '—'}</td>
       <td>${badge}</td>
       <td>${date}</td>
       <td>
-        <div class="actions">
-          <button class="btn-sm" onclick="viewEnquiry(${e.id})">View</button>
-          ${st!=='replied'?`<button class="btn-sm gold" onclick="markReplied(${e.id})">Replied</button>`:''}
-          <button class="btn-sm danger" onclick="deleteEnquiry(${e.id})">✕</button>
-        </div>
+        <button onclick="viewEnquiry(${e.id})">View</button>
+        ${st !== 'replied' ? `<button onclick="markReplied(${e.id})">Replied</button>` : ''}
+        <button onclick="deleteEnquiry(${e.id})">Delete</button>
       </td>
     </tr>`;
   }).join('');
@@ -519,7 +482,7 @@ function handleSearch(v){
 // ==============================
 async function viewEnquiry(id) {
   try {
-    const res = await apiFetch(`${API}/enquiries/${id}`);
+    const res = await fetch(`${API}/enquiries/${id}`);
     if (!res.ok) throw new Error();
 
     const e = await res.json();
@@ -531,26 +494,21 @@ async function viewEnquiry(id) {
       renderTable();
     }
 
-    apiFetch(`${API}/enquiries/${id}/read`, { method: 'PUT' }).catch(()=>{});
-
     document.getElementById('m-title').textContent = `Enquiry #${e.id}`;
     document.getElementById('m-name').textContent = e.name || '—';
     document.getElementById('m-phone').textContent = e.phone || '—';
     document.getElementById('m-email').textContent = e.email || '—';
 
     document.getElementById('m-status').innerHTML =
-      `<span class="badge ${getStatus(id)}">${getStatus(id)}</span>`;
+      `<span class="badge">${getStatus(id)}</span>`;
 
     document.getElementById('m-car').textContent =
-      (e.make || e.model)
-        ? `${e.make || ''} ${e.model || ''}`.trim()
-        : 'General Enquiry';
+      (e.make || e.model) ? `${e.make || ''} ${e.model || ''}`.trim() : 'General';
 
-    document.getElementById('m-msg').textContent =
-      e.message || 'No message provided.';
+    document.getElementById('m-msg').textContent = e.message || 'No message';
 
     document.getElementById('m-date').textContent =
-      e.createdAt ? new Date(e.createdAt).toLocaleString('en-GB') : '—';
+      e.createdAt ? new Date(e.createdAt).toLocaleString() : '—';
 
     openModal();
 
@@ -560,26 +518,18 @@ async function viewEnquiry(id) {
 }
 
 // ==============================
-// UPDATE STATUS
-// ==============================
-function updateEnquiryStatus(id, newStatus) {
-  const enquiry = allEnquiries.find(e => e.id === id);
-  if (enquiry) enquiry.status = newStatus;
-  statuses[id] = newStatus;
-}
-
-// ==============================
 // MARK REPLIED
 // ==============================
 async function markReplied(id) {
   try {
-    const res = await apiFetch(`${API}/enquiries/${id}/replied`, {
-      method: 'PUT'
+    const res = await fetch(`${API}/enquiries/${id}/replied`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' }
     });
 
     if (!res.ok) throw new Error();
 
-    updateEnquiryStatus(id, 'replied');
+    setStatus(id, 'replied');
     updateStats();
     renderTable();
 
@@ -595,7 +545,7 @@ async function deleteEnquiry(id) {
   if (!confirm('Remove this enquiry?')) return;
 
   try {
-    const res = await apiFetch(`${API}/enquiries/${id}`, {
+    const res = await fetch(`${API}/enquiries/${id}`, {
       method: 'DELETE'
     });
 
@@ -622,18 +572,7 @@ function openModal() {
 function closeModal(e){
   const modal = document.getElementById('modal-overlay');
   if (e && e.target !== modal) return;
-  closeModalBtn();
-}
-
-function closeModalBtn(){
   document.getElementById('modal-overlay').classList.remove('open');
-}
-
-function authHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + localStorage.getItem('token')
-  };
 }
 
 // ==============================

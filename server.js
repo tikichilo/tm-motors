@@ -286,11 +286,20 @@ app.get('/api/analytics/conversion', async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
+// Storefront
 app.get('/', (req, res) => {
     const f = path.join(__dirname, 'index.html');
     res.sendFile(f, err => { if (err) res.json({ status: "T&M Motors API running" }); });
 });
 
+// Admin dashboard
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin', 'dashboard.html'));
+});
+
+app.get('/admin/enquiries', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin', 'que.html'));
+});
 app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.url} not found` }));
 
 app.listen(PORT, () => console.log(`🚗 T&M Motors running on http://localhost:${PORT}`));

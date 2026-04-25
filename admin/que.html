@@ -321,262 +321,309 @@
 
 <!-- ONLY SCRIPT PART UPDATED — KEEP YOUR CSS/HTML SAME -->
 <script>
-const API = 'http://localhost:3000/api';
+require('dotenv').config();
 
-let allEnquiries = [];
-let statuses = {};
-let currentFilter = localStorage.getItem('enquiryFilter') || 'all';
-let currentSearch = '';
-let activeEnquiry = null;
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const mongoose = require('mongoose');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 
-// ==============================
-// STATUS HELPERS
-// ==============================
-function getStatus(id){ return statuses[id] || 'new'; }
-function setStatus(id, s){ statuses[id] = s; }
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// ==============================
-// LOAD ENQUIRIES
-// ==============================
-async function loadEnquiries(){
-  const tbody = document.getElementById('q-tbody');
-
-  tbody.innerHTML = `<tr><td colspan="8"><div class="loading">Loading queries...</div></td></tr>`;
-
-  try {
-    const res = await fetch(`${API}/enquiries`);
-    if(!res.ok) throw new Error();
-
-    const data = await res.json();
-    allEnquiries = Array.isArray(data) ? data : [];
-
-    updateStats();
-    renderTable();
-
-  } catch(e) {
-    console.error(e);
-
-    tbody.innerHTML = `
-      <tr><td colspan="8">
-        <div class="empty-state">
-          <div class="empty-icon">⚠️</div>
-          <p style="color:var(--danger)">Could not connect to server.</p>
-        </div>
-      </td></tr>
-    `;
-
-    allEnquiries = [];
-  }
+if (!process.env.MONGO_URI) {
+    console.error("❌ Missing MONGO_URI");
+    process.exit(1);
 }
 
-// ==============================
-// STATS
-// ==============================
-function updateStats(){
-  const total = allEnquiries.length;
+// Increase body limit for base64 image uploads (10 images)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cors({ origin: "*", credentials: false }));
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }));
+app.use(morgan('dev'));
 
-  const newC = allEnquiries.filter(e => (e.status || 'new') === 'new').length;
-  const replied = allEnquiries.filter(e => e.status === 'replied').length;
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => { console.error('❌ MongoDB error:', err.message); process.exit(1); });
 
-  const today = allEnquiries.filter(e => {
-    if(!e.createdAt) return false;
-    const d = new Date(e.createdAt);
-    return d.toDateString() === new Date().toDateString();
-  }).length;
+// =======================
+// SCHEMAS
+// =======================
+const carSchema = new mongoose.Schema({
+    make:        { type: String, required: true },
+    model:       { type: String, required: true },
+    year:        Number,
+    price:       { type: Number, required: true },
+    mileage:     Number,
+    color:       String,
+    description: String,
+    image:       String,          // primary image (backward compat)
+    images:      [String],        // up to 10 images (base64 or URL)
+    status:      { type: String, default: 'available' },
+    soldDate:    String,
+    createdAt:   { type: String, default: () => new Date().toISOString() }
+});
 
-  document.getElementById('s-total').textContent = total;
-  document.getElementById('s-new').textContent = newC;
-  document.getElementById('s-replied').textContent = replied;
-  document.getElementById('s-today').textContent = today;
-}
+const enquirySchema = new mongoose.Schema({
+    carId:     { type: String, default: null },
+    carMake:   String,
+    carModel:  String,
+    carYear:   Number,
+    name:      { type: String, required: true },
+    phone:     String,
+    email:     String,
+    message:   String,
+    status:    { type: String, default: 'new' },
+    repliedAt: String,
+    createdAt: { type: String, default: () => new Date().toISOString() }
+});
 
-// ==============================
-// TABLE RENDER
-// ==============================
-function renderTable(){
-  const tbody = document.getElementById('q-tbody');
-  let data = [...allEnquiries];
+const Car     = mongoose.model('Car', carSchema);
+const Enquiry = mongoose.model('Enquiry', enquirySchema);
 
-  if(currentFilter !== 'all'){
-    data = data.filter(e => getStatus(e.id) === currentFilter);
-  }
-
-  if(currentSearch){
-    const s = currentSearch.toLowerCase();
-    data = data.filter(e =>
-      (e.name || '').toLowerCase().includes(s) ||
-      (e.phone || '').includes(s) ||
-      (e.email || '').toLowerCase().includes(s) ||
-      (e.make || '').toLowerCase().includes(s) ||
-      (e.model || '').toLowerCase().includes(s) ||
-      (e.message || '').toLowerCase().includes(s)
-    );
-  }
-
-  if(!data.length){
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">📭 No queries found</div></td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = data.map(e => {
-
-    const st = getStatus(e.id);
-
-    const car = (e.make || e.model)
-      ? `${e.make || ''} ${e.model || ''}`.trim()
-      : '<span style="color:var(--text-dim)">General</span>';
-
-    const contact = e.phone || e.email || '<span style="color:var(--text-dim)">—</span>';
-
-    const date = e.createdAt
-      ? new Date(e.createdAt).toLocaleDateString('en-GB',{
-          day:'2-digit',month:'short',year:'numeric'
-        })
-      : '—';
-
-    const badge =
-      st==='new'
-      ? '<span class="badge new">● New</span>'
-      : st==='replied'
-      ? '<span class="badge replied">✓ Replied</span>'
-      : '<span class="badge read">Read</span>';
-
-    return `
-    <tr>
-      <td>#${e.id}</td>
-      <td>${e.name || '—'}</td>
-      <td>${contact}</td>
-      <td>${car}</td>
-      <td>${e.message || '—'}</td>
-      <td>${badge}</td>
-      <td>${date}</td>
-      <td>
-        <button onclick="viewEnquiry(${e.id})">View</button>
-        ${st !== 'replied' ? `<button onclick="markReplied(${e.id})">Replied</button>` : ''}
-        <button onclick="deleteEnquiry(${e.id})">Delete</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-// ==============================
-// FILTERS
-// ==============================
-function setFilter(f, el){
-  currentFilter = f;
-  localStorage.setItem('enquiryFilter', f);
-
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-
-  renderTable();
-}
-
-function handleSearch(v){
-  currentSearch = v.toLowerCase();
-  renderTable();
-}
-
-// ==============================
-// VIEW ENQUIRY
-// ==============================
-async function viewEnquiry(id) {
-  try {
-    const res = await fetch(`${API}/enquiries/${id}`);
-    if (!res.ok) throw new Error();
-
-    const e = await res.json();
-    activeEnquiry = e;
-
-    if (getStatus(id) === 'new') {
-      setStatus(id, 'read');
-      updateStats();
-      renderTable();
+function carOut(c) {
+    const obj = c.toObject();
+    obj.id = obj._id.toString();
+    if (!obj.images || !obj.images.length) {
+        obj.images = obj.image ? [obj.image] : [];
     }
-
-    document.getElementById('m-title').textContent = `Enquiry #${e.id}`;
-    document.getElementById('m-name').textContent = e.name || '—';
-    document.getElementById('m-phone').textContent = e.phone || '—';
-    document.getElementById('m-email').textContent = e.email || '—';
-
-    document.getElementById('m-status').innerHTML =
-      `<span class="badge">${getStatus(id)}</span>`;
-
-    document.getElementById('m-car').textContent =
-      (e.make || e.model) ? `${e.make || ''} ${e.model || ''}`.trim() : 'General';
-
-    document.getElementById('m-msg').textContent = e.message || 'No message';
-
-    document.getElementById('m-date').textContent =
-      e.createdAt ? new Date(e.createdAt).toLocaleString() : '—';
-
-    openModal();
-
-  } catch (err) {
-    console.warn(err);
-  }
+    return obj;
 }
 
-// ==============================
-// MARK REPLIED
-// ==============================
-async function markReplied(id) {
-  try {
-    const res = await fetch(`${API}/enquiries/${id}/replied`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (!res.ok) throw new Error();
-
-    setStatus(id, 'replied');
-    updateStats();
-    renderTable();
-
-  } catch (err) {
-    console.warn(err);
-  }
+function enqOut(e) {
+    const obj = e.toObject();
+    obj.id = obj._id.toString();
+    return obj;
 }
 
-// ==============================
-// DELETE
-// ==============================
-async function deleteEnquiry(id) {
-  if (!confirm('Remove this enquiry?')) return;
+// =======================
+// CAR ROUTES
+// =======================
+app.get('/api/cars', async (req, res) => {
+    try {
+        const cars = await Car.find({ status: 'available' }).sort({ createdAt: -1 });
+        res.json(cars.map(carOut));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch cars" });
+    }
+});
 
-  try {
-    const res = await fetch(`${API}/enquiries/${id}`, {
-      method: 'DELETE'
-    });
+app.get('/api/cars/:id', async (req, res) => {
+    try {
+        const car = await Car.findById(req.params.id);
+        if (!car) return res.status(404).json({ error: "Not found" });
+        res.json(carOut(car));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch car" });
+    }
+});
 
-    if (!res.ok) throw new Error();
+app.post('/api/cars', async (req, res) => {
+    try {
+        const { make, model, year, price, mileage, color, description, image, images } = req.body;
+        if (!make || !model || !price) return res.status(400).json({ error: "Make, model, price required" });
 
-    allEnquiries = allEnquiries.filter(e => e.id !== id);
-    delete statuses[id];
+        let imgs = [];
+        if (Array.isArray(images) && images.length) imgs = images.slice(0, 10);
+        else if (image) imgs = [image];
 
-    updateStats();
-    renderTable();
+        const car = await new Car({
+            make: make.trim(), model: model.trim(),
+            year: year ? Number(year) : null,
+            price: Number(price),
+            mileage: mileage ? Number(mileage) : null,
+            color: color || null, description: description || null,
+            image: imgs[0] || null, images: imgs
+        }).save();
 
-  } catch (err) {
-    console.warn(err);
-  }
-}
+        res.status(201).json({ success: true, ...carOut(car) });
+    } catch (err) {
+        console.error('❌ ADD CAR:', err.message);
+        res.status(500).json({ error: "Failed to add car" });
+    }
+});
 
-// ==============================
-// MODAL
-// ==============================
-function openModal() {
-  document.getElementById('modal-overlay').classList.add('open');
-}
+app.put('/api/cars/:id', async (req, res) => {
+    try {
+        const { make, model, year, price, mileage, color, description, image, images } = req.body;
+        let imgs = [];
+        if (Array.isArray(images) && images.length) imgs = images.slice(0, 10);
+        else if (image) imgs = [image];
 
-function closeModal(e){
-  const modal = document.getElementById('modal-overlay');
-  if (e && e.target !== modal) return;
-  document.getElementById('modal-overlay').classList.remove('open');
-}
+        await Car.findByIdAndUpdate(req.params.id, {
+            make, model,
+            year: year ? Number(year) : null,
+            price: Number(price),
+            mileage: mileage ? Number(mileage) : null,
+            color, description,
+            image: imgs[0] || null,
+            images: imgs
+        });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update car" });
+    }
+});
 
-// ==============================
-// INIT
-// ==============================
-loadEnquiries();
+app.delete('/api/cars/:id', async (req, res) => {
+    try {
+        await Car.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to delete car" });
+    }
+});
+
+app.post('/api/sell', async (req, res) => {
+    try {
+        await Car.findByIdAndUpdate(req.body.id, { status: 'sold', soldDate: new Date().toISOString() });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to sell car" });
+    }
+});
+
+app.get('/api/sold', async (req, res) => {
+    try {
+        const sold = await Car.find({ status: 'sold' }).sort({ soldDate: -1 });
+        res.json(sold.map(carOut));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch sold cars" });
+    }
+});
+
+app.post('/api/restore', async (req, res) => {
+    try {
+        await Car.findByIdAndUpdate(req.body.id, { status: 'available', soldDate: null });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Restore failed" });
+    }
+});
+
+// =======================
+// ENQUIRY ROUTES
+// =======================
+app.post('/api/enquiries', async (req, res) => {
+    try {
+        const { carId, carMake, carModel, carYear, name, phone, email, message } = req.body;
+        if (!name) return res.status(400).json({ error: "Name is required" });
+
+        const enquiry = await new Enquiry({
+            carId: carId || null, carMake: carMake || null,
+            carModel: carModel || null, carYear: carYear || null,
+            name, phone: phone || null, email: email || null,
+            message: message || null, status: 'new'
+        }).save();
+
+        res.json({ success: true, id: enquiry._id });
+    } catch (err) {
+        console.error('❌ ENQUIRY:', err.message);
+        res.status(500).json({ error: "Failed to submit enquiry" });
+    }
+});
+
+app.get('/api/enquiries', async (req, res) => {
+    try {
+        const data = await Enquiry.find().sort({ createdAt: -1 });
+        res.json(data.map(enqOut));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch enquiries" });
+    }
+});
+
+app.get('/api/enquiries/:id', async (req, res) => {
+    try {
+        const e = await Enquiry.findById(req.params.id);
+        if (!e) return res.status(404).json({ error: "Not found" });
+        res.json(enqOut(e));
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch enquiry" });
+    }
+});
+
+app.put('/api/enquiries/:id/replied', async (req, res) => {
+    try {
+        await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied', repliedAt: new Date().toISOString() });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update enquiry" });
+    }
+});
+
+app.delete('/api/enquiries/:id', async (req, res) => {
+    try {
+        await Enquiry.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to delete enquiry" });
+    }
+});
+
+// =======================
+// ANALYTICS
+// =======================
+app.get('/api/analytics/enquiries-per-day', async (req, res) => {
+    try {
+        const data = await Enquiry.aggregate([
+            { $group: { _id: { $substr: ["$createdAt", 0, 10] }, total: { $sum: 1 } } },
+            { $sort: { _id: 1 } },
+            { $project: { date: "$_id", total: 1, _id: 0 } }
+        ]);
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: "Analytics failed" });
+    }
+});
+
+app.get('/api/analytics/top-cars', async (req, res) => {
+    try {
+        const data = await Enquiry.aggregate([
+            { $group: { _id: "$carId", make: { $first: "$carMake" }, model: { $first: "$carModel" }, total: { $sum: 1 } } },
+            { $sort: { total: -1 } }, { $limit: 5 }
+        ]);
+        res.json(data.map(d => ({ id: d._id, make: d.make || '?', model: d.model || '?', total: d.total })));
+    } catch (err) {
+        res.status(500).json({ error: "Analytics failed" });
+    }
+});
+
+app.get('/api/analytics/conversion', async (req, res) => {
+    try {
+        const enquiries = await Enquiry.countDocuments();
+        const sold      = await Car.countDocuments({ status: 'sold' });
+        res.json({ enquiries, sold, conversionRate: enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0 });
+    } catch (err) {
+        res.status(500).json({ error: "Analytics failed" });
+    }
+});
+
+// =======================
+// STATIC + ROUTES
+// =======================
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/admin', express.static(path.join(__dirname, 'admin')));
+
+// Storefront
+app.get('/', (req, res) => {
+    const f = path.join(__dirname, 'index.html');
+    res.sendFile(f, err => { if (err) res.json({ status: "T&M Motors API running" }); });
+});
+
+// Admin dashboard
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin', 'dashboard.html'));
+});
+
+app.get('/admin/enquiries', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin', 'que.html'));
+});
+app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.url} not found` }));
+
+app.listen(PORT, () => console.log(`🚗 T&M Motors running on http://localhost:${PORT}`));
 </script>

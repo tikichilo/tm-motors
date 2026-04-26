@@ -288,7 +288,7 @@ app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
 // Storefront
 app.get('/', (req, res) => {
-    const f = path.join(__dirname, 'index.html');
+    const f = path.join(__dirname, 'public', 'index.html');  // ← changed
     res.sendFile(f, err => { if (err) res.json({ status: "T&M Motors API running" }); });
 });
 

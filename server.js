@@ -29,11 +29,16 @@ if (!process.env.SESSION_SECRET) {
 }
 
 // =======================
+// TRUST PROXY (required on Render for secure cookies)
+// =======================
+app.set('trust proxy', 1);
+
+// =======================
 // MIDDLEWARE
 // =======================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(cors({ origin: "*", credentials: false }));
+app.use(cors({ origin: true, credentials: true }));  // ← fixed: credentials must be true
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 
@@ -46,7 +51,8 @@ app.use(session({
     saveUninitialized: false,
     cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production', // true on Render (HTTPS)
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ← required for cross-origin cookies
         maxAge: 8 * 60 * 60 * 1000  // 8 hours
     }
 }));
@@ -122,14 +128,11 @@ function enqOut(e) {
 // =======================
 // AUTH MIDDLEWARE
 // =======================
-
-// For API routes — returns 401 JSON
 function requireAdmin(req, res, next) {
     if (req.session && req.session.isAdmin) return next();
     res.status(401).json({ error: 'Unauthorized — please log in at /admin/login' });
 }
 
-// For page routes — redirects to login
 function requireAdminPage(req, res, next) {
     if (req.session && req.session.isAdmin) return next();
     res.redirect('/admin/login');
@@ -144,9 +147,13 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
 
     if (code === process.env.ADMIN_CODE) {
         req.session.isAdmin = true;
-        return res.json({ success: true });
+        req.session.save(err => {  // ← explicitly save session before responding
+            if (err) return res.status(500).json({ error: 'Session error' });
+            return res.json({ success: true });
+        });
+    } else {
+        return res.status(401).json({ error: 'Invalid code' });
     }
-    return res.status(401).json({ error: 'Invalid code' });
 });
 
 app.post('/api/admin/logout', (req, res) => {
@@ -160,8 +167,6 @@ app.get('/api/admin/check', (req, res) => {
 // =======================
 // CAR ROUTES
 // =======================
-
-// Public — storefront reads these
 app.get('/api/cars', async (req, res) => {
     try {
         const cars = await Car.find({ status: 'available' }).sort({ createdAt: -1 });
@@ -181,7 +186,6 @@ app.get('/api/cars/:id', async (req, res) => {
     }
 });
 
-// Admin only — write operations
 app.post('/api/cars', requireAdmin, async (req, res) => {
     try {
         const { make, model, year, price, mileage, color, description, image, images } = req.body;
@@ -268,8 +272,6 @@ app.post('/api/restore', requireAdmin, async (req, res) => {
 // =======================
 // ENQUIRY ROUTES
 // =======================
-
-// Public — customers submit enquiries from storefront
 app.post('/api/enquiries', async (req, res) => {
     try {
         const { carId, carMake, carModel, carYear, name, phone, email, message } = req.body;
@@ -289,7 +291,6 @@ app.post('/api/enquiries', async (req, res) => {
     }
 });
 
-// Admin only — read & manage
 app.get('/api/enquiries', requireAdmin, async (req, res) => {
     try {
         const data = await Enquiry.find().sort({ createdAt: -1 });
@@ -328,7 +329,7 @@ app.delete('/api/enquiries/:id', requireAdmin, async (req, res) => {
 });
 
 // =======================
-// ANALYTICS — admin only
+// ANALYTICS
 // =======================
 app.get('/api/analytics/enquiries-per-day', requireAdmin, async (req, res) => {
     try {
@@ -368,26 +369,23 @@ app.get('/api/analytics/conversion', requireAdmin, async (req, res) => {
 // =======================
 // STATIC + PAGE ROUTES
 // =======================
-
-// Public storefront static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Storefront index
 app.get('/', (req, res) => {
     const f = path.join(__dirname, 'public', 'index.html');
     res.sendFile(f, err => { if (err) res.json({ status: "T&M Motors API running" }); });
 });
 
-// Login page — public
+// Login — public
 app.get('/admin/login', (req, res) => {
     if (req.session && req.session.isAdmin) return res.redirect('/admin/dashboard');
     res.sendFile(path.join(__dirname, 'admin', 'login.html'));
 });
 
-// /admin root → redirect to login
+// /admin root → login
 app.get('/admin', (req, res) => res.redirect('/admin/login'));
 
-// Protected admin pages
+// Protected pages
 app.get('/admin/dashboard', requireAdminPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin', 'dashboard.html'));
 });
@@ -396,7 +394,7 @@ app.get('/admin/enquiries', requireAdminPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin', 'que.html'));
 });
 
-// All other /admin static assets — protected
+// Protected static admin assets
 app.use('/admin', requireAdminPage, express.static(path.join(__dirname, 'admin')));
 
 // 404

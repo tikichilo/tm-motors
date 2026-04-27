@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>T&M Motors — Admin Security</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Cormorant+Garamond:wght@700&family=Montserrat:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+  :root{
+    --bg:#F5B800;
+    --transition-speed:0.6s;
+  }
+
+  body{
+    font-family:'Share Tech Mono',monospace;
+    background:var(--bg);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background var(--transition-speed) ease;
+    overflow:hidden;
+    position:relative;
+  }
+
+  /* Animated grid overlay */
+  body::before{
+    content:'';
+    position:fixed;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);
+    background-size:40px 40px;
+    pointer-events:none;
+    z-index:0;
+    animation:gridMove 20s linear infinite;
+  }
+
+  @keyframes gridMove{
+    0%{background-position:0 0;}
+    100%{background-position:40px 40px;}
+  }
+
+  /* Scanline effect */
+  body::after{
+    content:'';
+    position:fixed;
+    inset:0;
+    background:repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .container{
+    position:relative;
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:0;
+    text-align:center;
+    animation:bootUp 0.8s ease both;
+  }
+
+  @keyframes bootUp{
+    from{opacity:0;transform:translateY(30px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+
+  /* Decorative top bar */
+  .top-bar{
+    width:2px;
+    height:60px;
+    background:rgba(0,0,0,0.25);
+    margin-bottom:24px;
+    position:relative;
+  }
+  .top-bar::before,.top-bar::after{
+    content:'';
+    position:absolute;
+    left:50%;transform:translateX(-50%);
+    width:8px;height:8px;border-radius:50%;
+    background:rgba(0,0,0,0.35);
+  }
+  .top-bar::before{top:0;}
+  .top-bar::after{bottom:0;}
+
+  /* Brand */
+  .brand{
+    font-family:'Cormorant Garamond',serif;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:0.5em;
+    text-transform:uppercase;
+    color:rgba(0,0,0,0.45);
+    margin-bottom:8px;
+  }
+
+  /* Main heading */
+  .main-title{
+    font-family:'Share Tech Mono',monospace;
+    font-size:clamp(36px,8vw,72px);
+    font-weight:400;
+    color:rgba(0,0,0,0.85);
+    letter-spacing:-0.02em;
+    line-height:1;
+    margin-bottom:6px;
+    text-shadow:3px 3px 0 rgba(0,0,0,0.1);
+    position:relative;
+  }
+
+  .main-title .cursor{
+    display:inline-block;
+    width:4px;
+    height:0.85em;
+    background:rgba(0,0,0,0.7);
+    margin-left:4px;
+    vertical-align:middle;
+    animation:blink 1s step-end infinite;
+  }
+
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+
+  .sub-title{
+    font-size:11px;
+    letter-spacing:0.25em;
+    text-transform:uppercase;
+    color:rgba(0,0,0,0.4);
+    margin-bottom:48px;
+  }
+
+  /* Card */
+  .card{
+    background:rgba(0,0,0,0.08);
+    border:1px solid rgba(0,0,0,0.12);
+    border-radius:4px;
+    padding:40px 48px;
+    width:360px;
+    backdrop-filter:blur(4px);
+    transition:background var(--transition-speed) ease, border-color var(--transition-speed) ease;
+  }
+
+  .card-label{
+    font-size:10px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:rgba(0,0,0,0.4);
+    margin-bottom:12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .card-label::before,.card-label::after{
+    content:'';
+    flex:1;
+    height:1px;
+    background:rgba(0,0,0,0.15);
+  }
+
+  /* Code input */
+  .code-wrap{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin-bottom:24px;
+  }
+
+  .code-char{
+    width:44px;
+    height:56px;
+    background:rgba(0,0,0,0.1);
+    border:2px solid rgba(0,0,0,0.2);
+    border-radius:4px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Share Tech Mono',monospace;
+    font-size:24px;
+    font-weight:400;
+    color:rgba(0,0,0,0.8);
+    transition:all 0.2s ease;
+    position:relative;
+  }
+
+  .code-char.filled{
+    background:rgba(0,0,0,0.15);
+    border-color:rgba(0,0,0,0.4);
+  }
+
+  .code-char.active{
+    border-color:rgba(0,0,0,0.6);
+    background:rgba(0,0,0,0.12);
+    box-shadow:0 0 0 3px rgba(0,0,0,0.08);
+  }
+
+  /* Hidden real input */
+  #real-input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+    width:1px;height:1px;
+  }
+
+  /* Submit button */
+  .btn-submit{
+    width:100%;
+    padding:14px;
+    background:rgba(0,0,0,0.75);
+    color:#F5B800;
+    border:none;
+    border-radius:4px;
+    font-family:'Share Tech Mono',monospace;
+    font-size:13px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    margin-bottom:16px;
+  }
+
+  .btn-submit:hover{background:rgba(0,0,0,0.9);}
+  .btn-submit:active{transform:scale(0.98);}
+
+  .error-msg{
+    font-size:10px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:rgba(0,0,0,0.5);
+    min-height:16px;
+    transition:color 0.3s;
+  }
+
+  .error-msg.show{color:rgba(180,0,0,0.7);}
+
+  /* Status indicator */
+  .status-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:24px;
+    font-size:10px;
+    letter-spacing:0.15em;
+    color:rgba(0,0,0,0.35);
+  }
+
+  .status-dot{
+    width:6px;height:6px;border-radius:50%;
+    background:rgba(0,0,0,0.3);
+    animation:pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot{
+    0%,100%{opacity:1;transform:scale(1);}
+    50%{opacity:0.4;transform:scale(0.8);}
+  }
+
+  /* Bottom line */
+  .bottom-bar{
+    width:2px;height:40px;
+    background:rgba(0,0,0,0.2);
+    margin-top:24px;
+  }
+
+  /* STATE: ERROR — red */
+  body.state-error{--bg:#c0392b;}
+  body.state-error .main-title{color:rgba(255,255,255,0.9);}
+  body.state-error .brand{color:rgba(255,255,255,0.5);}
+  body.state-error .sub-title{color:rgba(255,255,255,0.4);}
+  body.state-error .card{background:rgba(0,0,0,0.15);border-color:rgba(255,255,255,0.15);}
+  body.state-error .card-label{color:rgba(255,255,255,0.4);}
+  body.state-error .card-label::before,body.state-error .card-label::after{background:rgba(255,255,255,0.15);}
+  body.state-error .code-char{background:rgba(255,0,0,0.1);border-color:rgba(255,100,100,0.4);color:rgba(255,255,255,0.9);}
+  body.state-error .btn-submit{background:rgba(0,0,0,0.4);color:#fff;}
+  body.state-error .error-msg{color:rgba(255,255,255,0.7)!important;}
+  body.state-error .status-dot{background:rgba(255,255,255,0.4);}
+  body.state-error .status-row{color:rgba(255,255,255,0.35);}
+  body.state-error .top-bar,.body.state-error .bottom-bar{background:rgba(255,255,255,0.2);}
+
+  /* shake animation */
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    20%{transform:translateX(-8px);}
+    40%{transform:translateX(8px);}
+    60%{transform:translateX(-6px);}
+    80%{transform:translateX(6px);}
+  }
+  .shake{animation:shake 0.4s ease both;}
+
+  /* STATE: SUCCESS — green */
+  body.state-success{--bg:#1a7a4a;}
+  body.state-success .main-title{color:rgba(255,255,255,0.95);}
+  body.state-success .brand{color:rgba(255,255,255,0.5);}
+  body.state-success .sub-title{color:rgba(255,255,255,0.4);}
+  body.state-success .card{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);}
+  body.state-success .card-label{color:rgba(255,255,255,0.5);}
+  body.state-success .card-label::before,body.state-success .card-label::after{background:rgba(255,255,255,0.2);}
+  body.state-success .code-char{background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.4);color:#fff;}
+  body.state-success .btn-submit{background:rgba(255,255,255,0.2);color:#fff;}
+  body.state-success .status-row{color:rgba(255,255,255,0.4);}
+  body.state-success .status-dot{background:rgba(255,255,255,0.5);}
+
+  /* Welcome popup */
+  .welcome-popup{
+    position:fixed;
+    inset:0;
+    z-index:100;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.4);
+    backdrop-filter:blur(8px);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.4s ease;
+  }
+
+  .welcome-popup.show{opacity:1;pointer-events:auto;}
+
+  .welcome-box{
+    background:#0D0F12;
+    border:1px solid rgba(245,184,0,0.3);
+    border-radius:8px;
+    padding:48px 56px;
+    text-align:center;
+    transform:scale(0.85);
+    transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  .welcome-popup.show .welcome-box{transform:scale(1);}
+
+  .welcome-icon{font-size:48px;margin-bottom:16px;}
+
+  .welcome-title{
+    font-family:'Cormorant Garamond',serif;
+    font-size:32px;
+    font-weight:700;
+    color:#F5B800;
+    margin-bottom:8px;
+    letter-spacing:-0.01em;
+  }
+
+  .welcome-sub{
+    font-family:'Share Tech Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.2em;
+    color:rgba(255,255,255,0.4);
+    text-transform:uppercase;
+    margin-bottom:32px;
+  }
+
+  .welcome-redirect{
+    font-size:10px;
+    letter-spacing:0.15em;
+    color:rgba(255,255,255,0.25);
+    text-transform:uppercase;
+  }
+
+  .welcome-bar{
+    width:0%;
+    height:2px;
+    background:#F5B800;
+    margin:16px auto 0;
+    max-width:200px;
+    transition:width 1.8s linear;
+  }
+
+  .welcome-bar.go{width:100%;}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="top-bar"></div>
+  <div class="brand">T&amp;M Motors</div>
+  <h1 class="main-title">ADMIN<br/>SECURITY<span class="cursor"></span></h1>
+  <p class="sub-title">Restricted Access Terminal</p>
+
+  <div class="card" id="login-card">
+    <div class="card-label">Enter Code</div>
+
+    <div class="code-wrap" id="code-wrap" onclick="focusInput()">
+      <div class="code-char active" id="char-0">_</div>
+      <div class="code-char" id="char-1">_</div>
+      <div class="code-char" id="char-2">_</div>
+      <div class="code-char" id="char-3">_</div>
+      <div class="code-char" id="char-4">_</div>
+      <div class="code-char" id="char-5">_</div>
+    </div>
+
+    <input id="real-input" type="password" maxlength="6" autocomplete="off"
+      oninput="handleInput()" onkeydown="handleKey(event)"/>
+
+    <button class="btn-submit" onclick="submitCode()">[ AUTHENTICATE ]</button>
+    <div class="error-msg" id="err-msg"></div>
+
+    <div class="status-row">
+      <div class="status-dot"></div>
+      <span>SYSTEM ONLINE · AWAITING CLEARANCE</span>
+    </div>
+  </div>
+
+  <div class="bottom-bar"></div>
+</div>
+
+<!-- Welcome popup -->
+<div class="welcome-popup" id="welcome-popup">
+  <div class="welcome-box">
+    <div class="welcome-icon">🔓</div>
+    <div class="welcome-title">Welcome, Sir.</div>
+    <div class="welcome-sub">Access Granted · T&amp;M Command Centre</div>
+    <div class="welcome-redirect">Redirecting to dashboard…</div>
+    <div class="welcome-bar" id="welcome-bar"></div>
+  </div>
+</div>
+
+<script>
+  const CODE_LENGTH = 6;
+  let currentInput = '';
+  let locked = false;
+
+  const input = document.getElementById('real-input');
+
+  function focusInput() {
+    if (!locked) input.focus();
+  }
+
+  // Auto-focus on load
+  window.addEventListener('load', () => setTimeout(() => input.focus(), 300));
+
+  function handleInput() {
+    if (locked) return;
+    const raw = input.value.replace(/\s/g, '').slice(0, CODE_LENGTH);
+    input.value = raw;
+    currentInput = raw;
+    updateDisplay();
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter') submitCode();
+  }
+
+  function updateDisplay() {
+    for (let i = 0; i < CODE_LENGTH; i++) {
+      const el = document.getElementById(`char-${i}`);
+      if (i < currentInput.length) {
+        el.textContent = '●';
+        el.classList.add('filled');
+        el.classList.remove('active');
+      } else if (i === currentInput.length) {
+        el.textContent = '_';
+        el.classList.add('active');
+        el.classList.remove('filled');
+      } else {
+        el.textContent = '_';
+        el.classList.remove('filled', 'active');
+      }
+    }
+
+    // Auto-submit when full
+    if (currentInput.length === CODE_LENGTH) {
+      setTimeout(submitCode, 200);
+    }
+  }
+
+  async function submitCode() {
+    if (locked || currentInput.length === 0) return;
+    locked = true;
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: currentInput })
+      });
+
+      if (res.ok) {
+        // SUCCESS
+        document.body.classList.add('state-success');
+        showWelcome();
+      } else {
+        // ERROR
+        triggerError();
+      }
+    } catch {
+      triggerError();
+    }
+  }
+
+  function triggerError() {
+    document.body.classList.remove('state-success');
+    document.body.classList.add('state-error');
+
+    const card = document.getElementById('login-card');
+    card.classList.add('shake');
+
+    const err = document.getElementById('err-msg');
+    err.textContent = '[ ACCESS DENIED — INVALID CODE ]';
+    err.classList.add('show');
+
+    setTimeout(() => {
+      card.classList.remove('shake');
+      // Reset after 1.5s
+      setTimeout(resetState, 1500);
+    }, 400);
+  }
+
+  function resetState() {
+    document.body.classList.remove('state-error', 'state-success');
+    currentInput = '';
+    input.value = '';
+    locked = false;
+    updateDisplay();
+    const err = document.getElementById('err-msg');
+    err.textContent = '';
+    err.classList.remove('show');
+    input.focus();
+  }
+
+  function showWelcome() {
+    const popup = document.getElementById('welcome-popup');
+    popup.classList.add('show');
+    setTimeout(() => {
+      document.getElementById('welcome-bar').classList.add('go');
+    }, 100);
+    setTimeout(() => {
+      window.location.href = '/admin/dashboard';
+    }, 2200);
+  }
+</script>
+</body>
+</html>

@@ -7,23 +7,64 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// =======================
+// ENV CHECKS
+// =======================
 if (!process.env.MONGO_URI) {
     console.error("❌ Missing MONGO_URI");
     process.exit(1);
 }
+if (!process.env.ADMIN_CODE) {
+    console.error("❌ Missing ADMIN_CODE in .env");
+    process.exit(1);
+}
+if (!process.env.SESSION_SECRET) {
+    console.error("❌ Missing SESSION_SECRET in .env");
+    process.exit(1);
+}
 
-// Increase body limit for base64 image uploads (10 images)
+// =======================
+// MIDDLEWARE
+// =======================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors({ origin: "*", credentials: false }));
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }));
 app.use(morgan('dev'));
 
+// =======================
+// SESSION
+// =======================
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 8 * 60 * 60 * 1000  // 8 hours
+    }
+}));
+
+// =======================
+// RATE LIMITERS
+// =======================
+app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }));
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'Too many attempts. Try again in 15 minutes.' }
+});
+
+// =======================
+// DATABASE
+// =======================
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ MongoDB connected'))
     .catch(err => { console.error('❌ MongoDB error:', err.message); process.exit(1); });
@@ -39,8 +80,8 @@ const carSchema = new mongoose.Schema({
     mileage:     Number,
     color:       String,
     description: String,
-    image:       String,          // primary image (backward compat)
-    images:      [String],        // up to 10 images (base64 or URL)
+    image:       String,
+    images:      [String],
     status:      { type: String, default: 'available' },
     soldDate:    String,
     createdAt:   { type: String, default: () => new Date().toISOString() }
@@ -79,8 +120,48 @@ function enqOut(e) {
 }
 
 // =======================
+// AUTH MIDDLEWARE
+// =======================
+
+// For API routes — returns 401 JSON
+function requireAdmin(req, res, next) {
+    if (req.session && req.session.isAdmin) return next();
+    res.status(401).json({ error: 'Unauthorized — please log in at /admin/login' });
+}
+
+// For page routes — redirects to login
+function requireAdminPage(req, res, next) {
+    if (req.session && req.session.isAdmin) return next();
+    res.redirect('/admin/login');
+}
+
+// =======================
+// AUTH ROUTES
+// =======================
+app.post('/api/admin/login', loginLimiter, (req, res) => {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'Code required' });
+
+    if (code === process.env.ADMIN_CODE) {
+        req.session.isAdmin = true;
+        return res.json({ success: true });
+    }
+    return res.status(401).json({ error: 'Invalid code' });
+});
+
+app.post('/api/admin/logout', (req, res) => {
+    req.session.destroy(() => res.json({ success: true }));
+});
+
+app.get('/api/admin/check', (req, res) => {
+    res.json({ authenticated: !!(req.session && req.session.isAdmin) });
+});
+
+// =======================
 // CAR ROUTES
 // =======================
+
+// Public — storefront reads these
 app.get('/api/cars', async (req, res) => {
     try {
         const cars = await Car.find({ status: 'available' }).sort({ createdAt: -1 });
@@ -100,7 +181,8 @@ app.get('/api/cars/:id', async (req, res) => {
     }
 });
 
-app.post('/api/cars', async (req, res) => {
+// Admin only — write operations
+app.post('/api/cars', requireAdmin, async (req, res) => {
     try {
         const { make, model, year, price, mileage, color, description, image, images } = req.body;
         if (!make || !model || !price) return res.status(400).json({ error: "Make, model, price required" });
@@ -125,7 +207,7 @@ app.post('/api/cars', async (req, res) => {
     }
 });
 
-app.put('/api/cars/:id', async (req, res) => {
+app.put('/api/cars/:id', requireAdmin, async (req, res) => {
     try {
         const { make, model, year, price, mileage, color, description, image, images } = req.body;
         let imgs = [];
@@ -147,7 +229,7 @@ app.put('/api/cars/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/cars/:id', async (req, res) => {
+app.delete('/api/cars/:id', requireAdmin, async (req, res) => {
     try {
         await Car.findByIdAndDelete(req.params.id);
         res.json({ success: true });
@@ -156,7 +238,7 @@ app.delete('/api/cars/:id', async (req, res) => {
     }
 });
 
-app.post('/api/sell', async (req, res) => {
+app.post('/api/sell', requireAdmin, async (req, res) => {
     try {
         await Car.findByIdAndUpdate(req.body.id, { status: 'sold', soldDate: new Date().toISOString() });
         res.json({ success: true });
@@ -165,7 +247,7 @@ app.post('/api/sell', async (req, res) => {
     }
 });
 
-app.get('/api/sold', async (req, res) => {
+app.get('/api/sold', requireAdmin, async (req, res) => {
     try {
         const sold = await Car.find({ status: 'sold' }).sort({ soldDate: -1 });
         res.json(sold.map(carOut));
@@ -174,7 +256,7 @@ app.get('/api/sold', async (req, res) => {
     }
 });
 
-app.post('/api/restore', async (req, res) => {
+app.post('/api/restore', requireAdmin, async (req, res) => {
     try {
         await Car.findByIdAndUpdate(req.body.id, { status: 'available', soldDate: null });
         res.json({ success: true });
@@ -186,6 +268,8 @@ app.post('/api/restore', async (req, res) => {
 // =======================
 // ENQUIRY ROUTES
 // =======================
+
+// Public — customers submit enquiries from storefront
 app.post('/api/enquiries', async (req, res) => {
     try {
         const { carId, carMake, carModel, carYear, name, phone, email, message } = req.body;
@@ -205,7 +289,8 @@ app.post('/api/enquiries', async (req, res) => {
     }
 });
 
-app.get('/api/enquiries', async (req, res) => {
+// Admin only — read & manage
+app.get('/api/enquiries', requireAdmin, async (req, res) => {
     try {
         const data = await Enquiry.find().sort({ createdAt: -1 });
         res.json(data.map(enqOut));
@@ -214,7 +299,7 @@ app.get('/api/enquiries', async (req, res) => {
     }
 });
 
-app.get('/api/enquiries/:id', async (req, res) => {
+app.get('/api/enquiries/:id', requireAdmin, async (req, res) => {
     try {
         const e = await Enquiry.findById(req.params.id);
         if (!e) return res.status(404).json({ error: "Not found" });
@@ -224,7 +309,7 @@ app.get('/api/enquiries/:id', async (req, res) => {
     }
 });
 
-app.put('/api/enquiries/:id/replied', async (req, res) => {
+app.put('/api/enquiries/:id/replied', requireAdmin, async (req, res) => {
     try {
         await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied', repliedAt: new Date().toISOString() });
         res.json({ success: true });
@@ -233,7 +318,7 @@ app.put('/api/enquiries/:id/replied', async (req, res) => {
     }
 });
 
-app.delete('/api/enquiries/:id', async (req, res) => {
+app.delete('/api/enquiries/:id', requireAdmin, async (req, res) => {
     try {
         await Enquiry.findByIdAndDelete(req.params.id);
         res.json({ success: true });
@@ -243,9 +328,9 @@ app.delete('/api/enquiries/:id', async (req, res) => {
 });
 
 // =======================
-// ANALYTICS
+// ANALYTICS — admin only
 // =======================
-app.get('/api/analytics/enquiries-per-day', async (req, res) => {
+app.get('/api/analytics/enquiries-per-day', requireAdmin, async (req, res) => {
     try {
         const data = await Enquiry.aggregate([
             { $group: { _id: { $substr: ["$createdAt", 0, 10] }, total: { $sum: 1 } } },
@@ -258,7 +343,7 @@ app.get('/api/analytics/enquiries-per-day', async (req, res) => {
     }
 });
 
-app.get('/api/analytics/top-cars', async (req, res) => {
+app.get('/api/analytics/top-cars', requireAdmin, async (req, res) => {
     try {
         const data = await Enquiry.aggregate([
             { $group: { _id: "$carId", make: { $first: "$carMake" }, model: { $first: "$carModel" }, total: { $sum: 1 } } },
@@ -270,7 +355,7 @@ app.get('/api/analytics/top-cars', async (req, res) => {
     }
 });
 
-app.get('/api/analytics/conversion', async (req, res) => {
+app.get('/api/analytics/conversion', requireAdmin, async (req, res) => {
     try {
         const enquiries = await Enquiry.countDocuments();
         const sold      = await Car.countDocuments({ status: 'sold' });
@@ -281,25 +366,40 @@ app.get('/api/analytics/conversion', async (req, res) => {
 });
 
 // =======================
-// STATIC + ROUTES
+// STATIC + PAGE ROUTES
 // =======================
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
-// Storefront
+// Public storefront static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Storefront index
 app.get('/', (req, res) => {
-    const f = path.join(__dirname, 'public', 'index.html');  // ← changed
+    const f = path.join(__dirname, 'public', 'index.html');
     res.sendFile(f, err => { if (err) res.json({ status: "T&M Motors API running" }); });
 });
 
-// Admin dashboard
-app.get('/admin', (req, res) => {
+// Login page — public
+app.get('/admin/login', (req, res) => {
+    if (req.session && req.session.isAdmin) return res.redirect('/admin/dashboard');
+    res.sendFile(path.join(__dirname, 'admin', 'login.html'));
+});
+
+// /admin root → redirect to login
+app.get('/admin', (req, res) => res.redirect('/admin/login'));
+
+// Protected admin pages
+app.get('/admin/dashboard', requireAdminPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin', 'dashboard.html'));
 });
 
-app.get('/admin/enquiries', (req, res) => {
+app.get('/admin/enquiries', requireAdminPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin', 'que.html'));
 });
+
+// All other /admin static assets — protected
+app.use('/admin', requireAdminPage, express.static(path.join(__dirname, 'admin')));
+
+// 404
 app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.url} not found` }));
 
 app.listen(PORT, () => console.log(`🚗 T&M Motors running on http://localhost:${PORT}`));

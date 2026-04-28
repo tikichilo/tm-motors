@@ -19,10 +19,6 @@ if (!process.env.MONGO_URI) {
     console.error("❌ Missing MONGO_URI");
     process.exit(1);
 }
-if (!process.env.ADMIN_CODE) {
-    console.error("❌ Missing ADMIN_CODE in .env");
-    process.exit(1);
-}
 if (!process.env.SESSION_SECRET) {
     console.error("❌ Missing SESSION_SECRET in .env");
     process.exit(1);

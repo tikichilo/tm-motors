@@ -19,6 +19,14 @@ if (!process.env.MONGO_URI) {
     console.error("❌ Missing MONGO_URI");
     process.exit(1);
 }
+if (!process.env.ADMIN_CODE) {
+    console.error("❌ Missing ADMIN_CODE in .env");
+    process.exit(1);
+}
+if (!process.env.SESSION_SECRET) {
+    console.error("❌ Missing SESSION_SECRET in .env");
+    process.exit(1);
+}
 
 // =======================
 // TRUST PROXY (required on Render for secure cookies)
@@ -30,28 +38,24 @@ app.set('trust proxy', 1);
 // =======================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: true, credentials: true }));  // ← fixed: credentials must be true
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 
 // =======================
-// SESSION (only if SECRET is set — required for admin dashboard)
+// SESSION
 // =======================
-if (process.env.SESSION_SECRET) {
-    app.use(session({
-        secret: process.env.SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
-        cookie: {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-            maxAge: 8 * 60 * 60 * 1000  // 8 hours
-        }
-    }));
-} else {
-    console.warn("⚠️  SESSION_SECRET not set — admin dashboard will be unavailable");
-}
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // true on Render (HTTPS)
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ← required for cross-origin cookies
+        maxAge: 8 * 60 * 60 * 1000  // 8 hours
+    }
+}));
 
 // =======================
 // RATE LIMITERS
@@ -143,7 +147,7 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
 
     if (code === process.env.ADMIN_CODE) {
         req.session.isAdmin = true;
-        req.session.save(err => {
+        req.session.save(err => {  // ← explicitly save session before responding
             if (err) return res.status(500).json({ error: 'Session error' });
             return res.json({ success: true });
         });

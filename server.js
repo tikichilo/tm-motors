@@ -266,11 +266,19 @@ app.post('/api/restore', requireAdmin, async (req, res) => {
 });
 
 // =======================
+// YOUR WHATSAPP NUMBERS (international format, no + or spaces)
+// =======================
+const WHATSAPP_NUMBERS = [
+    '260978918196',
+    '260776379305',
+];
+
+// =======================
 // ENQUIRY ROUTES
 // =======================
 app.post('/api/enquiries', async (req, res) => {
     try {
-        const { carId, carMake, carModel, carYear, name, phone, email, message } = req.body;
+        const { carId, carMake, carModel, carYear, carPrice, name, phone, email, message } = req.body;
         if (!name) return res.status(400).json({ error: "Name is required" });
 
         const enquiry = await new Enquiry({
@@ -280,7 +288,29 @@ app.post('/api/enquiries', async (req, res) => {
             message: message || null, status: 'new'
         }).save();
 
-        res.json({ success: true, id: enquiry._id });
+        // Build pre-filled WhatsApp message
+        const carLabel = [carYear, carMake, carModel].filter(Boolean).join(' ');
+        const priceLabel = carPrice ? `R${Number(carPrice).toLocaleString()}` : 'Price on request';
+
+        const waMessage = [
+            `Hi, I'm interested in the *${carLabel}* (${priceLabel}).`,
+            ``,
+            `*My details:*`,
+            `Name: ${name}`,
+            phone   ? `Phone: ${phone}`     : null,
+            email   ? `Email: ${email}`     : null,
+            message ? `Message: ${message}` : null,
+        ].filter(line => line !== null).join('\n');
+
+        const encodedMsg = encodeURIComponent(waMessage);
+
+        const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
+            number: num,
+            url: `https://wa.me/${num}?text=${encodedMsg}`
+        }));
+
+        res.json({ success: true, id: enquiry._id, whatsappLinks });
+
     } catch (err) {
         console.error('❌ ENQUIRY:', err.message);
         res.status(500).json({ error: "Failed to submit enquiry" });

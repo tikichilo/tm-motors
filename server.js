@@ -35,7 +35,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 
 // =======================
-// SESSION (only if SECRET is set — required for admin dashboard)
+// SESSION
 // =======================
 if (process.env.SESSION_SECRET) {
     app.use(session({
@@ -89,7 +89,9 @@ const carSchema = new mongoose.Schema({
     createdAt:   { type: String, default: () => new Date().toISOString() }
 });
 
+// ── Enquiry schema — includes pre-order fields ──
 const enquirySchema = new mongoose.Schema({
+    // Standard enquiry fields
     carId:     { type: String, default: null },
     carMake:   String,
     carModel:  String,
@@ -100,7 +102,16 @@ const enquirySchema = new mongoose.Schema({
     message:   String,
     status:    { type: String, default: 'new' },
     repliedAt: String,
-    createdAt: { type: String, default: () => new Date().toISOString() }
+    createdAt: { type: String, default: () => new Date().toISOString() },
+
+    // Pre-order specific fields
+    isPreOrder:   { type: Boolean, default: false },
+    spec:         String,   // e.g. "South African Spec", "Japanese Spec (JDM)"
+    color1:       String,   // 1st colour preference
+    color2:       String,   // 2nd colour preference
+    transmission: String,   // "Automatic" | "Manual" | null
+    budget:       String,   // max budget as entered by user
+    extraNotes:   String,   // additional requirements
 });
 
 const Car     = mongoose.model('Car', carSchema);
@@ -135,11 +146,10 @@ function requireAdminPage(req, res, next) {
 }
 
 // =======================
-// cron check
+// HEALTH CHECK
 // =======================
 app.get('/health', async (req, res) => {
     const state = mongoose.connection.readyState;
-    // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
     if (state === 1) {
         res.status(200).json({ status: 'ok', db: 'connected' });
     } else {
@@ -279,7 +289,7 @@ app.post('/api/restore', requireAdmin, async (req, res) => {
 });
 
 // =======================
-// YOUR WHATSAPP NUMBERS (international format, no + or spaces)
+// WHATSAPP NUMBERS
 // =======================
 const WHATSAPP_NUMBERS = [
     '260978918196',
@@ -291,35 +301,81 @@ const WHATSAPP_NUMBERS = [
 // =======================
 app.post('/api/enquiries', async (req, res) => {
     try {
-        const { carId, carMake, carModel, carYear, carPrice, name, phone, email, message } = req.body;
+        const {
+            // Standard fields
+            carId, carMake, carModel, carYear, carPrice,
+            name, phone, email, message,
+            // Pre-order fields
+            isPreOrder, spec, color1, color2, transmission, budget, extraNotes
+        } = req.body;
+
         if (!name) return res.status(400).json({ error: "Name is required" });
 
         const enquiry = await new Enquiry({
-            carId: carId || null, carMake: carMake || null,
-            carModel: carModel || null, carYear: carYear || null,
-            name, phone: phone || null, email: email || null,
-            message: message || null, status: 'new'
+            carId:    carId    || null,
+            carMake:  carMake  || null,
+            carModel: carModel || null,
+            carYear:  carYear  || null,
+            name,
+            phone:    phone    || null,
+            email:    email    || null,
+            message:  message  || null,
+            status:   'new',
+            // Pre-order fields — stored only when present
+            isPreOrder:   !!isPreOrder,
+            spec:         spec         || null,
+            color1:       color1       || null,
+            color2:       color2       || null,
+            transmission: transmission || null,
+            budget:       budget       || null,
+            extraNotes:   extraNotes   || null,
         }).save();
 
-        // Build pre-filled WhatsApp message
-        const carLabel = [carYear, carMake, carModel].filter(Boolean).join(' ');
-        const priceLabel = carPrice ? `R${Number(carPrice).toLocaleString()}` : 'Price on request';
+        // ── Build WhatsApp message ──
+        const carLabel   = [carYear, carMake, carModel].filter(Boolean).join(' ');
+        const priceLabel = carPrice ? `K ${Number(carPrice).toLocaleString()}` : 'Price on request';
 
-        const waMessage = [
-            `Hi, I'm interested in the *${carLabel}* (${priceLabel}).`,
-            ``,
-            `*My details:*`,
-            `Name: ${name}`,
-            phone   ? `Phone: ${phone}`     : null,
-            email   ? `Email: ${email}`     : null,
-            message ? `Message: ${message}` : null,
-        ].filter(line => line !== null).join('\n');
+        let waLines;
 
+        if (isPreOrder) {
+            // Pre-order WhatsApp summary
+            waLines = [
+                `✨ *PRE-ORDER REQUEST*`,
+                ``,
+                `*Looking for:* ${[carMake, carModel, carYear].filter(Boolean).join(' ') || 'Not specified'}`,
+                spec         ? `*Spec:* ${spec}`                           : null,
+                color1       ? `*1st Colour:* ${color1}`                   : null,
+                color2       ? `*2nd Colour:* ${color2}`                   : null,
+                transmission ? `*Transmission:* ${transmission}`            : null,
+                budget       ? `*Max Budget:* K ${budget}`                  : null,
+                extraNotes   ? `*Extra Requirements:* ${extraNotes}`        : null,
+                ``,
+                `*Customer Details:*`,
+                `Name: ${name}`,
+                phone  ? `Phone: ${phone}`  : null,
+                email  ? `Email: ${email}`  : null,
+            ];
+        } else {
+            // Standard enquiry WhatsApp summary
+            waLines = [
+                carLabel
+                    ? `Hi, I'm interested in the *${carLabel}* (${priceLabel}).`
+                    : `Hi, I have a general enquiry.`,
+                ``,
+                `*My details:*`,
+                `Name: ${name}`,
+                phone   ? `Phone: ${phone}`     : null,
+                email   ? `Email: ${email}`     : null,
+                message ? `Message: ${message}` : null,
+            ];
+        }
+
+        const waMessage  = waLines.filter(l => l !== null).join('\n');
         const encodedMsg = encodeURIComponent(waMessage);
 
         const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
             number: num,
-            url: `https://wa.me/${num}?text=${encodedMsg}`
+            url:    `https://wa.me/${num}?text=${encodedMsg}`
         }));
 
         res.json({ success: true, id: enquiry._id, whatsappLinks });
@@ -351,7 +407,10 @@ app.get('/api/enquiries/:id', requireAdmin, async (req, res) => {
 
 app.put('/api/enquiries/:id/replied', requireAdmin, async (req, res) => {
     try {
-        await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied', repliedAt: new Date().toISOString() });
+        await Enquiry.findByIdAndUpdate(req.params.id, {
+            status: 'replied',
+            repliedAt: new Date().toISOString()
+        });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Failed to update enquiry" });
@@ -387,7 +446,8 @@ app.get('/api/analytics/top-cars', requireAdmin, async (req, res) => {
     try {
         const data = await Enquiry.aggregate([
             { $group: { _id: "$carId", make: { $first: "$carMake" }, model: { $first: "$carModel" }, total: { $sum: 1 } } },
-            { $sort: { total: -1 } }, { $limit: 5 }
+            { $sort: { total: -1 } },
+            { $limit: 5 }
         ]);
         res.json(data.map(d => ({ id: d._id, make: d.make || '?', model: d.model || '?', total: d.total })));
     } catch (err) {
@@ -398,8 +458,14 @@ app.get('/api/analytics/top-cars', requireAdmin, async (req, res) => {
 app.get('/api/analytics/conversion', requireAdmin, async (req, res) => {
     try {
         const enquiries = await Enquiry.countDocuments();
+        const preOrders = await Enquiry.countDocuments({ isPreOrder: true });
         const sold      = await Car.countDocuments({ status: 'sold' });
-        res.json({ enquiries, sold, conversionRate: enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0 });
+        res.json({
+            enquiries,
+            preOrders,
+            sold,
+            conversionRate: enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0
+        });
     } catch (err) {
         res.status(500).json({ error: "Analytics failed" });
     }

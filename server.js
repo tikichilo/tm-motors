@@ -35,7 +35,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 
 // =======================
-// SESSION
+// SESSION (only if SECRET is set — required for admin dashboard)
 // =======================
 if (process.env.SESSION_SECRET) {
     app.use(session({
@@ -89,9 +89,7 @@ const carSchema = new mongoose.Schema({
     createdAt:   { type: String, default: () => new Date().toISOString() }
 });
 
-// ── Enquiry schema — includes pre-order fields ──
 const enquirySchema = new mongoose.Schema({
-    // Standard enquiry fields
     carId:     { type: String, default: null },
     carMake:   String,
     carModel:  String,
@@ -102,20 +100,29 @@ const enquirySchema = new mongoose.Schema({
     message:   String,
     status:    { type: String, default: 'new' },
     repliedAt: String,
-    createdAt: { type: String, default: () => new Date().toISOString() },
-
-    // Pre-order specific fields
-    isPreOrder:   { type: Boolean, default: false },
-    spec:         String,   // e.g. "South African Spec", "Japanese Spec (JDM)"
-    color1:       String,   // 1st colour preference
-    color2:       String,   // 2nd colour preference
-    transmission: String,   // "Automatic" | "Manual" | null
-    budget:       String,   // max budget as entered by user
-    extraNotes:   String,   // additional requirements
+    createdAt: { type: String, default: () => new Date().toISOString() }
 });
 
-const Car     = mongoose.model('Car', carSchema);
-const Enquiry = mongoose.model('Enquiry', enquirySchema);
+const preOrderSchema = new mongoose.Schema({
+    name:         { type: String, required: true },
+    phone:        { type: String, required: true },
+    email:        String,
+    make:         { type: String, required: true },
+    model:        { type: String, required: true },
+    year:         String,
+    spec:         String,
+    color1:       String,
+    color2:       String,
+    transmission: String,
+    budget:       String,
+    extraNotes:   String,
+    status:       { type: String, default: 'new' }, // new | contacted | fulfilled
+    createdAt:    { type: String, default: () => new Date().toISOString() }
+});
+
+const Car      = mongoose.model('Car', carSchema);
+const Enquiry  = mongoose.model('Enquiry', enquirySchema);
+const PreOrder = mongoose.model('PreOrder', preOrderSchema);
 
 function carOut(c) {
     const obj = c.toObject();
@@ -128,6 +135,12 @@ function carOut(c) {
 
 function enqOut(e) {
     const obj = e.toObject();
+    obj.id = obj._id.toString();
+    return obj;
+}
+
+function preOrderOut(p) {
+    const obj = p.toObject();
     obj.id = obj._id.toString();
     return obj;
 }
@@ -146,7 +159,7 @@ function requireAdminPage(req, res, next) {
 }
 
 // =======================
-// HEALTH CHECK
+// HEALTH CHECK (cron)
 // =======================
 app.get('/health', async (req, res) => {
     const state = mongoose.connection.readyState;
@@ -301,81 +314,33 @@ const WHATSAPP_NUMBERS = [
 // =======================
 app.post('/api/enquiries', async (req, res) => {
     try {
-        const {
-            // Standard fields
-            carId, carMake, carModel, carYear, carPrice,
-            name, phone, email, message,
-            // Pre-order fields
-            isPreOrder, spec, color1, color2, transmission, budget, extraNotes
-        } = req.body;
-
+        const { carId, carMake, carModel, carYear, carPrice, name, phone, email, message } = req.body;
         if (!name) return res.status(400).json({ error: "Name is required" });
 
         const enquiry = await new Enquiry({
-            carId:    carId    || null,
-            carMake:  carMake  || null,
-            carModel: carModel || null,
-            carYear:  carYear  || null,
-            name,
-            phone:    phone    || null,
-            email:    email    || null,
-            message:  message  || null,
-            status:   'new',
-            // Pre-order fields — stored only when present
-            isPreOrder:   !!isPreOrder,
-            spec:         spec         || null,
-            color1:       color1       || null,
-            color2:       color2       || null,
-            transmission: transmission || null,
-            budget:       budget       || null,
-            extraNotes:   extraNotes   || null,
+            carId: carId || null, carMake: carMake || null,
+            carModel: carModel || null, carYear: carYear || null,
+            name, phone: phone || null, email: email || null,
+            message: message || null, status: 'new'
         }).save();
 
-        // ── Build WhatsApp message ──
-        const carLabel   = [carYear, carMake, carModel].filter(Boolean).join(' ');
-        const priceLabel = carPrice ? `K ${Number(carPrice).toLocaleString()}` : 'Price on request';
+        const carLabel = [carYear, carMake, carModel].filter(Boolean).join(' ');
+        const priceLabel = carPrice ? `K${Number(carPrice).toLocaleString()}` : 'Price on request';
 
-        let waLines;
+        const waMessage = [
+            `Hi, I'm interested in the *${carLabel}* (${priceLabel}).`,
+            ``,
+            `*My details:*`,
+            `Name: ${name}`,
+            phone   ? `Phone: ${phone}`     : null,
+            email   ? `Email: ${email}`     : null,
+            message ? `Message: ${message}` : null,
+        ].filter(line => line !== null).join('\n');
 
-        if (isPreOrder) {
-            // Pre-order WhatsApp summary
-            waLines = [
-                `✨ *PRE-ORDER REQUEST*`,
-                ``,
-                `*Looking for:* ${[carMake, carModel, carYear].filter(Boolean).join(' ') || 'Not specified'}`,
-                spec         ? `*Spec:* ${spec}`                           : null,
-                color1       ? `*1st Colour:* ${color1}`                   : null,
-                color2       ? `*2nd Colour:* ${color2}`                   : null,
-                transmission ? `*Transmission:* ${transmission}`            : null,
-                budget       ? `*Max Budget:* K ${budget}`                  : null,
-                extraNotes   ? `*Extra Requirements:* ${extraNotes}`        : null,
-                ``,
-                `*Customer Details:*`,
-                `Name: ${name}`,
-                phone  ? `Phone: ${phone}`  : null,
-                email  ? `Email: ${email}`  : null,
-            ];
-        } else {
-            // Standard enquiry WhatsApp summary
-            waLines = [
-                carLabel
-                    ? `Hi, I'm interested in the *${carLabel}* (${priceLabel}).`
-                    : `Hi, I have a general enquiry.`,
-                ``,
-                `*My details:*`,
-                `Name: ${name}`,
-                phone   ? `Phone: ${phone}`     : null,
-                email   ? `Email: ${email}`     : null,
-                message ? `Message: ${message}` : null,
-            ];
-        }
-
-        const waMessage  = waLines.filter(l => l !== null).join('\n');
         const encodedMsg = encodeURIComponent(waMessage);
-
         const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
             number: num,
-            url:    `https://wa.me/${num}?text=${encodedMsg}`
+            url: `https://wa.me/${num}?text=${encodedMsg}`
         }));
 
         res.json({ success: true, id: enquiry._id, whatsappLinks });
@@ -407,10 +372,7 @@ app.get('/api/enquiries/:id', requireAdmin, async (req, res) => {
 
 app.put('/api/enquiries/:id/replied', requireAdmin, async (req, res) => {
     try {
-        await Enquiry.findByIdAndUpdate(req.params.id, {
-            status: 'replied',
-            repliedAt: new Date().toISOString()
-        });
+        await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied', repliedAt: new Date().toISOString() });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Failed to update enquiry" });
@@ -423,6 +385,104 @@ app.delete('/api/enquiries/:id', requireAdmin, async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Failed to delete enquiry" });
+    }
+});
+
+// =======================
+// PRE-ORDER ROUTES
+// =======================
+app.post('/api/preorders', async (req, res) => {
+    try {
+        const { name, phone, email, make, model, year, spec, color1, color2, transmission, budget, extraNotes } = req.body;
+
+        if (!name)           return res.status(400).json({ error: 'Name required' });
+        if (!phone)          return res.status(400).json({ error: 'Phone required' });
+        if (!make || !model) return res.status(400).json({ error: 'Make and model required' });
+
+        const order = await new PreOrder({
+            name, phone,
+            email:        email        || null,
+            make:         make.trim(),
+            model:        model.trim(),
+            year:         year         || null,
+            spec:         spec         || null,
+            color1:       color1       || null,
+            color2:       color2       || null,
+            transmission: transmission || null,
+            budget:       budget       || null,
+            extraNotes:   extraNotes   || null
+        }).save();
+
+        // Build WhatsApp notification
+        const waMessage = encodeURIComponent([
+            `🚗 *NEW PRE-ORDER REQUEST*`,
+            `──────────────────────`,
+            `*Customer:* ${name}`,
+            `*Phone:* ${phone}`,
+            email        ? `*Email:* ${email}`                                               : null,
+            ``,
+            `*Car Wanted:* ${make} ${model}${year ? ` (${year})` : ''}`,
+            `*Spec:* ${spec || 'No preference'}`,
+            `*Colours:* ${[color1, color2].filter(Boolean).join(' / ') || 'Not specified'}`,
+            `*Transmission:* ${transmission || 'No preference'}`,
+            `*Budget:* ${budget ? 'K ' + budget : 'Not specified'}`,
+            extraNotes   ? `*Extra:* ${extraNotes}`                                          : null,
+        ].filter(l => l !== null).join('\n'));
+
+        const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
+            number: num,
+            url: `https://wa.me/${num}?text=${waMessage}`
+        }));
+
+        res.status(201).json({ success: true, id: order._id, whatsappLinks });
+
+    } catch (err) {
+        console.error('❌ PRE-ORDER:', err.message);
+        res.status(500).json({ error: 'Failed to submit pre-order' });
+    }
+});
+
+// Admin — list all pre-orders
+app.get('/api/preorders', requireAdmin, async (req, res) => {
+    try {
+        const orders = await PreOrder.find().sort({ createdAt: -1 });
+        res.json(orders.map(preOrderOut));
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch pre-orders' });
+    }
+});
+
+// Admin — get single pre-order
+app.get('/api/preorders/:id', requireAdmin, async (req, res) => {
+    try {
+        const order = await PreOrder.findById(req.params.id);
+        if (!order) return res.status(404).json({ error: 'Not found' });
+        res.json(preOrderOut(order));
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch pre-order' });
+    }
+});
+
+// Admin — update status: new | contacted | fulfilled
+app.put('/api/preorders/:id/status', requireAdmin, async (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!['new', 'contacted', 'fulfilled'].includes(status))
+            return res.status(400).json({ error: 'Invalid status. Use: new, contacted, fulfilled' });
+        await PreOrder.findByIdAndUpdate(req.params.id, { status });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update pre-order status' });
+    }
+});
+
+// Admin — delete pre-order
+app.delete('/api/preorders/:id', requireAdmin, async (req, res) => {
+    try {
+        await PreOrder.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete pre-order' });
     }
 });
 
@@ -446,8 +506,7 @@ app.get('/api/analytics/top-cars', requireAdmin, async (req, res) => {
     try {
         const data = await Enquiry.aggregate([
             { $group: { _id: "$carId", make: { $first: "$carMake" }, model: { $first: "$carModel" }, total: { $sum: 1 } } },
-            { $sort: { total: -1 } },
-            { $limit: 5 }
+            { $sort: { total: -1 } }, { $limit: 5 }
         ]);
         res.json(data.map(d => ({ id: d._id, make: d.make || '?', model: d.model || '?', total: d.total })));
     } catch (err) {
@@ -458,14 +517,8 @@ app.get('/api/analytics/top-cars', requireAdmin, async (req, res) => {
 app.get('/api/analytics/conversion', requireAdmin, async (req, res) => {
     try {
         const enquiries = await Enquiry.countDocuments();
-        const preOrders = await Enquiry.countDocuments({ isPreOrder: true });
         const sold      = await Car.countDocuments({ status: 'sold' });
-        res.json({
-            enquiries,
-            preOrders,
-            sold,
-            conversionRate: enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0
-        });
+        res.json({ enquiries, sold, conversionRate: enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0 });
     } catch (err) {
         res.status(500).json({ error: "Analytics failed" });
     }
@@ -497,6 +550,10 @@ app.get('/admin/dashboard', requireAdminPage, (req, res) => {
 
 app.get('/admin/enquiries', requireAdminPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin', 'que.html'));
+});
+
+app.get('/admin/preorders', requireAdminPage, (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin', 'preorders.html'));
 });
 
 // Protected static admin assets

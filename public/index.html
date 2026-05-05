@@ -950,40 +950,47 @@ async function submitPreOrder(){
   if(!phone)return notify('Phone required','We need your WhatsApp/phone to reach you','error');
   if(!make||!model)return notify('Car details required','Please enter at least a make and model','error');
 
-  const colours=[color1,color2].filter(Boolean).join(' / ')||'Not specified';
-  const message=[
-    `PRE-ORDER REQUEST`,
-    `─────────────────`,
-    `Car: ${make} ${model}${year?' ('+year+')':''}`,
-    `Spec: ${spec||'No preference'}`,
-    `Colours: ${colours}`,
-    `Transmission: ${trans||'No preference'}`,
-    `Budget: ${budget?'K '+budget:'Not specified'}`,
-    `Extra requirements: ${notes||'None'}`,
-  ].join('\n');
-
   btn.disabled=true;
   btn.textContent='⏳ Sending…';
 
   try{
-    const res=await fetch(`${API}/enquiries`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      carId:null,carMake:make,carModel:model,carYear:year||null,
-      name,phone:phone||null,email:email||null,
-      message,
-      isPreOrder:true,
-      spec:spec||null,
-      color1:color1||null,color2:color2||null,
-      transmission:trans||null,
-      budget:budget||null,
-      extraNotes:notes||null
-    })});
-    if(!res.ok)throw new Error();
+    const res=await fetch(`${API}/preorders`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name,
+        phone,
+        email:        email || null,
+        make,
+        model,
+        year:         year  || null,
+        spec:         spec  || null,
+        color1:       color1|| null,
+        color2:       color2|| null,
+        transmission: trans || null,
+        budget:       budget|| null,
+        extraNotes:   notes || null
+      })
+    });
+
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Server error');
+
     notify('Pre-Order Received! 🎉',`We'll search for your ${make} ${model} and contact you soon`,'success',5000);
-    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+
+    // Clear all fields
+    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('po-spec').value='';
     document.getElementById('po-trans').value='';
-  }catch{notify('Failed to send','Please try again or call us directly','error');}
-  finally{btn.disabled=false;btn.textContent='✨ Submit Pre-Order Request';}
+
+  } catch(err) {
+    console.error('Pre-order error:',err);
+    notify('Failed to send','Please try again or call us directly','error');
+  } finally {
+    btn.disabled=false;
+    btn.textContent='✨ Submit Pre-Order Request';
+  }
 }
 
 /* ══════════════════════════════════

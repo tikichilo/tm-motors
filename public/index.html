@@ -43,7 +43,6 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 @keyframes notifOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(60px)}}
 @keyframes notifBar{from{width:100%}to{width:0%}}
 
-/* Mobile notif */
 @media(max-width:640px){
   .notif-wrap{top:auto;bottom:calc(var(--safe-bottom) + 90px);right:12px;left:12px;}
   .notif{min-width:unset;max-width:100%;animation:notifInMob 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;}
@@ -67,6 +66,22 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 .nav-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .nav-cta{padding:10px 20px;background:var(--gold);color:var(--dark);border:none;border-radius:9px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.04em;transition:var(--ease);box-shadow:0 4px 18px rgba(245,184,0,0.3);white-space:nowrap;}
 .nav-cta:hover{background:var(--gold-light);box-shadow:0 6px 26px rgba(245,184,0,0.45);transform:translateY(-1px);}
+
+/* Mobile hamburger */
+.nav-hamburger{display:none;width:40px;height:40px;background:var(--dark-3);border:1px solid var(--border);border-radius:9px;cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:5px;flex-shrink:0;transition:var(--ease);}
+.nav-hamburger:hover{border-color:var(--border-mid);}
+.nav-hamburger span{display:block;width:18px;height:1.5px;background:var(--text-muted);border-radius:2px;transition:var(--ease);}
+.nav-hamburger.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg);}
+.nav-hamburger.open span:nth-child(2){opacity:0;}
+.nav-hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg);}
+
+/* Mobile nav drawer */
+.mobile-nav-drawer{display:none;position:fixed;top:60px;left:0;right:0;background:rgba(12,14,17,0.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border-mid);z-index:99;padding:12px 16px 16px;flex-direction:column;gap:4px;}
+.mobile-nav-drawer.open{display:flex;animation:drawerIn 0.22s ease;}
+@keyframes drawerIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.mobile-nav-drawer .nav-link{font-size:14px;padding:12px 14px;border-radius:10px;border:1px solid transparent;}
+.mobile-nav-drawer .nav-link:hover{border-color:var(--border);background:var(--dark-3);}
+
 .call-dropdown{position:relative;}
 .call-menu{display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--dark-3);border:1px solid var(--border-mid);border-radius:12px;overflow:hidden;min-width:200px;z-index:200;box-shadow:0 20px 50px rgba(0,0,0,0.5);animation:dropIn 0.2s ease;}
 @keyframes dropIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
@@ -114,6 +129,11 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 .search-box input{background:none;border:none;outline:none;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;padding:13px 0;width:100%;}
 .search-box input::placeholder{color:var(--text-dim);}
 .search-icon-lbl{color:var(--text-dim);font-size:15px;}
+/* Clear button inside search */
+.search-clear{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;padding:2px 0;display:none;line-height:1;transition:color 0.2s;flex-shrink:0;}
+.search-clear:hover{color:var(--text-muted);}
+.search-clear.visible{display:block;}
+
 .sel{background:var(--dark-3);border:1px solid var(--border);border-radius:10px;padding:12px 36px 12px 14px;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text-muted);outline:none;cursor:pointer;transition:var(--ease);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%237A8294' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;-webkit-appearance:none;}
 .sel:focus{border-color:var(--gold);}
 .sel option{background:var(--dark-3);color:var(--text);}
@@ -305,10 +325,11 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 ::-webkit-scrollbar-thumb:hover{background:var(--gold-dim);}
 
 /* ──────────────────────────────────────────
-   MOBILE RESPONSIVE — PREMIUM
+   MOBILE RESPONSIVE
 ────────────────────────────────────────── */
 @media(max-width:1024px){
   .nav-links{display:none;}
+  .nav-hamburger{display:flex;}
   .hero-title{font-size:54px;}
 }
 
@@ -340,7 +361,6 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
   .hero-sub{font-size:14px;}
   .cars-grid{grid-template-columns:1fr;}
   .card-img{height:200px;}
-  /* Make nav arrows always visible on touch */
   .card-nav{opacity:1;width:28px;height:28px;font-size:15px;}
   .overlay{padding:0;align-items:flex-end;}
   .modal{border-radius:var(--radius-lg) var(--radius-lg) 0 0;max-height:93vh;width:100%;}
@@ -364,7 +384,6 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
   .color-row{grid-template-columns:1fr;}
 }
 
-/* iPhone notch / dynamic island */
 @supports(padding-top:env(safe-area-inset-top)){
   nav.nav{padding-top:env(safe-area-inset-top);}
   .footer{padding-bottom:calc(28px + env(safe-area-inset-bottom));}
@@ -375,6 +394,13 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 
 <!-- NOTIFICATION SYSTEM -->
 <div class="notif-wrap" id="notif-wrap"></div>
+
+<!-- Mobile nav drawer -->
+<div class="mobile-nav-drawer" id="mobile-nav-drawer">
+  <a class="nav-link active" href="#" onclick="closeMobileNav()">Home</a>
+  <a class="nav-link" href="#inventory" onclick="closeMobileNav()">Vehicles</a>
+  <a class="nav-link" href="#preorder" onclick="closeMobileNav()">Pre-Order</a>
+</div>
 
 <!-- NAV -->
 <nav class="nav">
@@ -392,6 +418,9 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
       <a class="nav-link" href="#preorder">Pre-Order</a>
     </div>
     <div class="nav-right">
+      <button class="nav-hamburger" id="nav-hamburger" onclick="toggleMobileNav()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
       <div class="call-dropdown">
         <button class="nav-cta" onclick="toggleCallMenu()" aria-label="Call Us">📞 Call Us</button>
         <div class="call-menu" id="call-menu">
@@ -411,8 +440,8 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
       <h1 class="hero-title">Find Your<br/><em>Perfect</em> Car<br/>in Lusaka</h1>
       <p class="hero-sub">Premium used vehicles, carefully selected and fairly priced. T&M Motors brings Zambia's finest automotive selection directly to you.</p>
       <div class="hero-actions">
-        <button class="btn-primary" onclick="scrollTo('inventory')">🔍 Browse All Cars</button>
-        <button class="btn-ghost" onclick="scrollTo('preorder')">✨ Pre-Order a Car</button>
+        <button class="btn-primary" onclick="scrollToSection('inventory')">🔍 Browse All Cars</button>
+        <button class="btn-ghost" onclick="scrollToSection('preorder')">✨ Pre-Order a Car</button>
       </div>
       <div class="hero-stats">
         <div><div class="stat-val" id="stat-stock">—</div><div class="stat-label">In Stock</div></div>
@@ -433,7 +462,8 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
   <div class="search-section-inner">
     <div class="search-box">
       <span class="search-icon-lbl">🔍</span>
-      <input type="text" id="search" placeholder="Search make, model, colour…" oninput="filterCars()" autocomplete="off" autocorrect="off" spellcheck="false"/>
+      <input type="text" id="search" placeholder="Search make, model, colour…" oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false"/>
+      <button class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Clear search">✕</button>
     </div>
     <select class="sel" id="filter-price" onchange="filterCars()">
       <option value="">All Prices</option>
@@ -639,7 +669,7 @@ const cardState={};
 /* ══════════════════════════════════
    NOTIFICATION SYSTEM
 ══════════════════════════════════ */
-function notify(title, sub='', type='default', duration=3800){
+function notify(title,sub='',type='default',duration=3800){
   const wrap=document.getElementById('notif-wrap');
   const icons={default:'🔔',success:'✅',error:'❌',info:'ℹ️'};
   const el=document.createElement('div');
@@ -651,19 +681,16 @@ function notify(title, sub='', type='default', duration=3800){
       ${sub?`<div class="notif-sub">${sub}</div>`:''}
     </div>
     <button class="notif-close" onclick="dismissNotif(this.parentElement)">✕</button>`;
-  el.style.setProperty('--dur', duration+'ms');
-  el.querySelector('::before');
-  // Set bar animation duration via inline style on ::before via a class var trick
   const bar=document.createElement('style');
   const uid='n'+Date.now();
   el.id=uid;
   bar.textContent=`#${uid}::before{animation-duration:${duration}ms;}`;
   document.head.appendChild(bar);
   wrap.appendChild(el);
-  const t=setTimeout(()=>dismissNotif(el, bar), duration);
-  el._timer=t; el._style=bar;
+  const t=setTimeout(()=>dismissNotif(el,bar),duration);
+  el._timer=t;el._style=bar;
 }
-function dismissNotif(el, styleEl){
+function dismissNotif(el,styleEl){
   if(!el||!el.parentElement)return;
   clearTimeout(el._timer);
   el.classList.add('out');
@@ -674,9 +701,56 @@ function dismissNotif(el, styleEl){
 /* ══════════════════════════════════
    UTILITIES
 ══════════════════════════════════ */
-function scrollTo(id){document.getElementById(id).scrollIntoView({behavior:'smooth'});}
+
+/* FIX: renamed from scrollTo() to avoid conflict with window.scrollTo() */
+function scrollToSection(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const navH=document.querySelector('nav.nav')?.offsetHeight||66;
+  const top=el.getBoundingClientRect().top+window.pageYOffset-navH-12;
+  window.scrollTo({top,behavior:'smooth'});
+}
+
 function fmtK(n){return n?'K '+Number(n).toLocaleString('en-ZM'):'—';}
 function getImgs(c){return(c.images&&c.images.length)?c.images:(c.image?[c.image]:[]);}
+
+/* ══════════════════════════════════
+   MOBILE NAV
+══════════════════════════════════ */
+function toggleMobileNav(){
+  const drawer=document.getElementById('mobile-nav-drawer');
+  const btn=document.getElementById('nav-hamburger');
+  const isOpen=drawer.classList.contains('open');
+  drawer.classList.toggle('open',!isOpen);
+  btn.classList.toggle('open',!isOpen);
+}
+function closeMobileNav(){
+  document.getElementById('mobile-nav-drawer').classList.remove('open');
+  document.getElementById('nav-hamburger').classList.remove('open');
+}
+/* Close mobile nav on outside click */
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#mobile-nav-drawer')&&!e.target.closest('#nav-hamburger')){
+    closeMobileNav();
+  }
+});
+
+/* ══════════════════════════════════
+   SEARCH WITH CLEAR BUTTON
+══════════════════════════════════ */
+function onSearchInput(){
+  const val=document.getElementById('search').value;
+  const clearBtn=document.getElementById('search-clear');
+  clearBtn.classList.toggle('visible',val.length>0);
+  filterCars();
+}
+function clearSearch(){
+  const input=document.getElementById('search');
+  input.value='';
+  document.getElementById('search-clear').classList.remove('visible');
+  input.focus();
+  filterCars();
+}
 
 /* ══════════════════════════════════
    INIT
@@ -829,10 +903,9 @@ function updateCardSlider(id){
 function initCardSwipe(id,total){
   const slider=document.getElementById(`slides-${id}`);
   if(!slider||total<=1)return;
-  let startX=0,isDragging=false;
+  let startX=0;
   slider.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;},{passive:true});
   slider.addEventListener('touchend',e=>{const diff=startX-e.changedTouches[0].clientX;if(Math.abs(diff)>30)diff>0?cardNext(id):cardPrev(id);},{passive:true});
-  // Show nav arrows briefly on touch
   slider.addEventListener('touchstart',()=>{
     const card=document.getElementById(`card-${id}`);
     card?.querySelectorAll('.card-nav').forEach(n=>n.classList.add('touch-vis'));
@@ -958,36 +1031,25 @@ async function submitPreOrder(){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        name,
-        phone,
-        email:        email || null,
-        make,
-        model,
-        year:         year  || null,
-        spec:         spec  || null,
-        color1:       color1|| null,
-        color2:       color2|| null,
-        transmission: trans || null,
-        budget:       budget|| null,
-        extraNotes:   notes || null
+        name,phone,
+        email:email||null,make,model,
+        year:year||null,spec:spec||null,
+        color1:color1||null,color2:color2||null,
+        transmission:trans||null,budget:budget||null,
+        extraNotes:notes||null
       })
     });
-
     const data=await res.json();
-    if(!res.ok) throw new Error(data.error||'Server error');
-
+    if(!res.ok)throw new Error(data.error||'Server error');
     notify('Pre-Order Received! 🎉',`We'll search for your ${make} ${model} and contact you soon`,'success',5000);
-
-    // Clear all fields
     ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes']
-      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+      .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('po-spec').value='';
     document.getElementById('po-trans').value='';
-
-  } catch(err) {
+  }catch(err){
     console.error('Pre-order error:',err);
     notify('Failed to send','Please try again or call us directly','error');
-  } finally {
+  }finally{
     btn.disabled=false;
     btn.textContent='✨ Submit Pre-Order Request';
   }
@@ -996,14 +1058,23 @@ async function submitPreOrder(){
 /* ══════════════════════════════════
    CALL MENU
 ══════════════════════════════════ */
-function toggleCallMenu(){document.getElementById('call-menu').classList.toggle('open');}
-document.addEventListener('click',e=>{if(!e.target.closest('.call-dropdown'))document.getElementById('call-menu')?.classList.remove('open');});
+function toggleCallMenu(){
+  document.getElementById('call-menu').classList.toggle('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.call-dropdown'))
+    document.getElementById('call-menu')?.classList.remove('open');
+});
+/* Close call menu on scroll */
+window.addEventListener('scroll',()=>{
+  document.getElementById('call-menu')?.classList.remove('open');
+},{ passive:true });
 
 /* ══════════════════════════════════
    KEYBOARD
 ══════════════════════════════════ */
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeModal();closeEnquiry();closeZoom();}
+  if(e.key==='Escape'){closeModal();closeEnquiry();closeZoom();closeMobileNav();}
   if(e.key==='ArrowRight')modalNext();
   if(e.key==='ArrowLeft')modalPrev();
 });

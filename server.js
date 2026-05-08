@@ -2,13 +2,11 @@ require('dotenv').config();
 
 const express    = require('express');
 const cors       = require('cors');
-const path       = require('path');
 const mongoose   = require('mongoose');
 const helmet     = require('helmet');
 const rateLimit  = require('express-rate-limit');
 const morgan     = require('morgan');
 const nodemailer = require('nodemailer');
-const cloudinary = require('cloudinary').v2;
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -20,23 +18,10 @@ if (!process.env.MONGO_URI) {
     console.error("❌ Missing MONGO_URI");
     process.exit(1);
 }
-if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-    console.error("❌ Missing Cloudinary env vars");
-    process.exit(1);
-}
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.error("❌ Missing EMAIL_USER or EMAIL_PASS in .env");
     process.exit(1);
 }
-
-// =======================
-// CLOUDINARY CONFIG
-// =======================
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key:    process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 // =======================
 // MAILER CONFIG
@@ -75,7 +60,7 @@ app.set('trust proxy', 1);
 // MIDDLEWARE
 // =======================
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
@@ -83,7 +68,13 @@ app.use(morgan('dev'));
 // =======================
 // RATE LIMITERS
 // =======================
-app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
+app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
+
+const submitLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max:      20,
+    message:  { error: 'Too many submissions. Try again in 15 minutes.' }
+});
 
 // =======================
 // DATABASE
@@ -176,7 +167,7 @@ app.get('/health', async (req, res) => {
 });
 
 // =======================
-// CAR ROUTES (public)
+// CAR ROUTES (read-only)
 // =======================
 app.get('/api/cars', async (req, res) => {
     try {
@@ -198,9 +189,9 @@ app.get('/api/cars/:id', async (req, res) => {
 });
 
 // =======================
-// ENQUIRY ROUTE (public)
+// ENQUIRY ROUTES
 // =======================
-app.post('/api/enquiries', async (req, res) => {
+app.post('/api/enquiries', submitLimiter, async (req, res) => {
     try {
         const { carId, carMake, carModel, carYear, name, phone, email, message } = req.body;
         if (!name) return res.status(400).json({ error: "Name is required" });
@@ -217,7 +208,6 @@ app.post('/api/enquiries', async (req, res) => {
             status:  'new'
         }).save();
 
-        // 🔔 EMAIL NOTIFICATION
         await sendNotification(
             `🚗 New Enquiry from ${name}`,
             `
@@ -269,9 +259,9 @@ app.post('/api/enquiries', async (req, res) => {
 });
 
 // =======================
-// PRE-ORDER ROUTE (public)
+// PRE-ORDER ROUTES
 // =======================
-app.post('/api/preorders', async (req, res) => {
+app.post('/api/preorders', submitLimiter, async (req, res) => {
     try {
         const { name, phone, email, make, model, year, spec, transmission, color1, color2, budget, extraNotes } = req.body;
         if (!name || !make || !model) return res.status(400).json({ error: "Name, make, and model are required" });
@@ -292,7 +282,6 @@ app.post('/api/preorders', async (req, res) => {
             status:       'new'
         }).save();
 
-        // 🔔 EMAIL NOTIFICATION
         await sendNotification(
             `📦 New Pre-Order from ${name}`,
             `
@@ -364,12 +353,8 @@ app.post('/api/preorders', async (req, res) => {
 });
 
 // =======================
-// SERVE PUBLIC SITE
+// 404
 // =======================
-app.use(express.static(path.join(__dirname, 'public')));
+app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.url} not found` }));
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(PORT, () => console.log(`🚗 T&M Motors public site running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚗 T&M Motors (public) running on http://localhost:${PORT}`));

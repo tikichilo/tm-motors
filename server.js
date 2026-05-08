@@ -43,6 +43,7 @@ requiredEnv.forEach((key) => {
 // MIDDLEWARE
 // =======================
 //
+
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false
@@ -96,28 +97,41 @@ cloudinary.config({
 //
 // =======================
 // MAILER
+// FIX: explicit SMTP settings instead of 'hotmail' shorthand.
+// Modern Outlook accounts require host/port to be set directly.
+// Transporter is created fresh per send so credentials are
+// always picked up correctly.
 // =======================
 //
 
-const transporter = nodemailer.createTransport({
-    service: 'hotmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
 async function sendNotification(subject, html) {
     try {
+        const transporter = nodemailer.createTransport({
+            host: 'smtp-mail.outlook.com',
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            },
+            tls: {
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
+            }
+        });
+
         await transporter.sendMail({
             from: `"T&M Motors" <${process.env.EMAIL_USER}>`,
             to: process.env.EMAIL_USER,
             subject,
             html
         });
+
+        console.log('✅ Email sent:', subject);
+
     } catch (err) {
-        // Log but don't crash the request if email fails
-        console.error('❌ Email send failed:', err.message);
+        // Non-fatal — log but never crash the route
+        console.error('❌ Email failed (non-fatal):', err.message);
     }
 }
 
@@ -355,25 +369,18 @@ app.get('/api/v1/cars', asyncHandler(async (req, res) => {
 
     res.json(cars.map(car => ({
         id: car._id.toString(),
-
         make: car.make,
         model: car.model,
         year: car.year,
-
         price: car.price || 0,
         mileage: car.mileage || 0,
-
         color: car.color || '',
         description: car.description || '',
-
         image: car.image || '',
-
         images: Array.isArray(car.images) && car.images.length
             ? car.images
             : (car.image ? [car.image] : []),
-
         status: car.status || 'available',
-
         createdAt: car.createdAt
     })));
 
@@ -402,6 +409,10 @@ app.get('/api/v1/cars/:id', asyncHandler(async (req, res) => {
 //
 // =======================
 // CREATE ENQUIRY
+// FIX: respond to client FIRST then send email in background.
+// Previously await sendNotification() blocked the response —
+// if email was slow or failed, the button stayed on "Sending..."
+// forever and the success popup never showed.
 // =======================
 //
 
@@ -409,7 +420,14 @@ app.post('/api/v1/enquiries', asyncHandler(async (req, res) => {
 
     const enquiry = await Enquiry.create(req.body);
 
-    await sendNotification(
+    // Respond to client immediately — success popup shows, overlay closes
+    res.status(201).json({
+        success: true,
+        id: enquiry._id
+    });
+
+    // Fire email in background — won't affect client response
+    void sendNotification(
         '🚗 New Enquiry — T&M Motors',
         `<h2>New Enquiry Received</h2>
          <p><strong>Name:</strong> ${enquiry.name}</p>
@@ -419,16 +437,12 @@ app.post('/api/v1/enquiries', asyncHandler(async (req, res) => {
          <p><strong>Message:</strong> ${enquiry.message || 'No message'}</p>`
     );
 
-    res.status(201).json({
-        success: true,
-        id: enquiry._id
-    });
-
 }));
 
 //
 // =======================
 // CREATE PRE-ORDER
+// FIX: same pattern — respond first, email in background
 // =======================
 //
 
@@ -436,7 +450,14 @@ app.post('/api/v1/preorders', asyncHandler(async (req, res) => {
 
     const preOrder = await PreOrder.create(req.body);
 
-    await sendNotification(
+    // Respond to client immediately
+    res.status(201).json({
+        success: true,
+        id: preOrder._id
+    });
+
+    // Fire email in background
+    void sendNotification(
         '✨ New Pre-Order Request — T&M Motors',
         `<h2>New Pre-Order Received</h2>
          <p><strong>Name:</strong> ${preOrder.name}</p>
@@ -449,11 +470,6 @@ app.post('/api/v1/preorders', asyncHandler(async (req, res) => {
          <p><strong>Budget:</strong> ${preOrder.budget ? 'K ' + preOrder.budget : 'Not specified'}</p>
          <p><strong>Extra Notes:</strong> ${preOrder.extraNotes || 'None'}</p>`
     );
-
-    res.status(201).json({
-        success: true,
-        id: preOrder._id
-    });
 
 }));
 
@@ -504,7 +520,9 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
     console.error('ROUTE ERROR:', err);
     res.status(err.status || 500).json({
-        error: err.message  // ← always show real error for now
+        error: process.env.NODE_ENV === 'production'
+            ? 'Internal server error'
+            : err.message
     });
 });
 
@@ -515,13 +533,9 @@ app.use((err, req, res, next) => {
 //
 
 process.on('SIGINT', async () => {
-
     console.log('🛑 Shutting down...');
-
     await mongoose.connection.close();
-
     process.exit(0);
-
 });
 
 //

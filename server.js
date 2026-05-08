@@ -28,7 +28,8 @@ const requiredEnv = [
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
     'EMAIL_USER',
-    'EMAIL_PASS'
+    'EMAIL_PASS',
+    'NOTIFY_EMAIL'
 ];
 
 requiredEnv.forEach((key) => {
@@ -61,7 +62,7 @@ app.use(express.json({
 
 app.use(express.urlencoded({
     extended: true,
-    limit: '50mb'
+    limit: '10mb'
 }));
 
 app.use(morgan('combined'));
@@ -97,32 +98,32 @@ cloudinary.config({
 //
 // =======================
 // MAILER
-// FIX: explicit SMTP settings instead of 'hotmail' shorthand.
-// Modern Outlook accounts require host/port to be set directly.
-// Transporter is created fresh per send so credentials are
-// always picked up correctly.
+// Using Gmail SMTP with an App Password.
+// Setup steps:
+//   1. Create a Gmail account e.g. tmmotorz@gmail.com
+//   2. Enable 2-Step Verification on that Google account
+//   3. Go to Google Account → Security → App passwords
+//   4. Generate an App Password for "Mail"
+//   5. In Render set:
+//        EMAIL_USER  = tmmotorz@gmail.com
+//        EMAIL_PASS  = the 16-char app password (no spaces)
+//        NOTIFY_EMAIL = tmmotorz@outlook.com  ← where you want to RECEIVE alerts
 // =======================
 //
 
 async function sendNotification(subject, html) {
     try {
         const transporter = nodemailer.createTransport({
-            host: 'smtp-mail.outlook.com',
-            port: 587,
-            secure: false,
+            service: 'gmail',
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
-            },
-            tls: {
-                ciphers: 'SSLv3',
-                rejectUnauthorized: false
             }
         });
 
         await transporter.sendMail({
             from: `"T&M Motors" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,
+            to: process.env.NOTIFY_EMAIL,
             subject,
             html
         });
@@ -130,7 +131,6 @@ async function sendNotification(subject, html) {
         console.log('✅ Email sent:', subject);
 
     } catch (err) {
-        // Non-fatal — log but never crash the route
         console.error('❌ Email failed (non-fatal):', err.message);
     }
 }
@@ -409,10 +409,6 @@ app.get('/api/v1/cars/:id', asyncHandler(async (req, res) => {
 //
 // =======================
 // CREATE ENQUIRY
-// FIX: respond to client FIRST then send email in background.
-// Previously await sendNotification() blocked the response —
-// if email was slow or failed, the button stayed on "Sending..."
-// forever and the success popup never showed.
 // =======================
 //
 
@@ -426,15 +422,44 @@ app.post('/api/v1/enquiries', asyncHandler(async (req, res) => {
         id: enquiry._id
     });
 
-    // Fire email in background — won't affect client response
+    // Send email in background — never blocks the client response
     void sendNotification(
         '🚗 New Enquiry — T&M Motors',
-        `<h2>New Enquiry Received</h2>
-         <p><strong>Name:</strong> ${enquiry.name}</p>
-         <p><strong>Phone:</strong> ${enquiry.phone || 'Not provided'}</p>
-         <p><strong>Email:</strong> ${enquiry.email || 'Not provided'}</p>
-         <p><strong>Car:</strong> ${enquiry.carMake || ''} ${enquiry.carModel || ''}${enquiry.carYear ? ' (' + enquiry.carYear + ')' : ''}</p>
-         <p><strong>Message:</strong> ${enquiry.message || 'No message'}</p>`
+        `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+          <div style="background:#1a1a2e;padding:24px;text-align:center;">
+            <h1 style="color:#ffffff;margin:0;font-size:22px;">🚗 T&M Motors</h1>
+            <p style="color:#aaa;margin:6px 0 0;">New Enquiry Received</p>
+          </div>
+          <div style="padding:24px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;width:120px;">👤 Name</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-weight:bold;">${enquiry.name}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">📞 Phone</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${enquiry.phone || 'Not provided'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">✉️ Email</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${enquiry.email || 'Not provided'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">🚘 Car</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${enquiry.carMake || ''} ${enquiry.carModel || ''}${enquiry.carYear ? ' (' + enquiry.carYear + ')' : ''}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;color:#888;vertical-align:top;">💬 Message</td>
+                <td style="padding:10px 0;">${enquiry.message || 'No message provided'}</td>
+              </tr>
+            </table>
+          </div>
+          <div style="background:#f9f9f9;padding:16px;text-align:center;color:#aaa;font-size:12px;">
+            T&M Motors • Auto-notification from your website
+          </div>
+        </div>
+        `
     );
 
 }));
@@ -442,7 +467,6 @@ app.post('/api/v1/enquiries', asyncHandler(async (req, res) => {
 //
 // =======================
 // CREATE PRE-ORDER
-// FIX: same pattern — respond first, email in background
 // =======================
 //
 
@@ -456,19 +480,60 @@ app.post('/api/v1/preorders', asyncHandler(async (req, res) => {
         id: preOrder._id
     });
 
-    // Fire email in background
+    // Send email in background
     void sendNotification(
         '✨ New Pre-Order Request — T&M Motors',
-        `<h2>New Pre-Order Received</h2>
-         <p><strong>Name:</strong> ${preOrder.name}</p>
-         <p><strong>Phone:</strong> ${preOrder.phone || 'Not provided'}</p>
-         <p><strong>Email:</strong> ${preOrder.email || 'Not provided'}</p>
-         <p><strong>Car:</strong> ${preOrder.make} ${preOrder.model}${preOrder.year ? ' (' + preOrder.year + ')' : ''}</p>
-         <p><strong>Spec:</strong> ${preOrder.spec || 'No preference'}</p>
-         <p><strong>Transmission:</strong> ${preOrder.transmission || 'No preference'}</p>
-         <p><strong>Colours:</strong> ${[preOrder.color1, preOrder.color2].filter(Boolean).join(' / ') || 'Not specified'}</p>
-         <p><strong>Budget:</strong> ${preOrder.budget ? 'K ' + preOrder.budget : 'Not specified'}</p>
-         <p><strong>Extra Notes:</strong> ${preOrder.extraNotes || 'None'}</p>`
+        `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+          <div style="background:#1a1a2e;padding:24px;text-align:center;">
+            <h1 style="color:#ffffff;margin:0;font-size:22px;">✨ T&M Motors</h1>
+            <p style="color:#aaa;margin:6px 0 0;">New Pre-Order Request</p>
+          </div>
+          <div style="padding:24px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;width:140px;">👤 Name</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-weight:bold;">${preOrder.name}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">📞 Phone</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${preOrder.phone || 'Not provided'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">✉️ Email</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${preOrder.email || 'Not provided'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">🚘 Car</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${preOrder.make} ${preOrder.model}${preOrder.year ? ' (' + preOrder.year + ')' : ''}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">⚙️ Spec</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${preOrder.spec || 'No preference'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">🔧 Transmission</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${preOrder.transmission || 'No preference'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">🎨 Colours</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${[preOrder.color1, preOrder.color2].filter(Boolean).join(' / ') || 'Not specified'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#888;">💰 Budget</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">${preOrder.budget ? 'K ' + preOrder.budget : 'Not specified'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0;color:#888;vertical-align:top;">📝 Notes</td>
+                <td style="padding:10px 0;">${preOrder.extraNotes || 'None'}</td>
+              </tr>
+            </table>
+          </div>
+          <div style="background:#f9f9f9;padding:16px;text-align:center;color:#aaa;font-size:12px;">
+            T&M Motors • Auto-notification from your website
+          </div>
+        </div>
+        `
     );
 
 }));

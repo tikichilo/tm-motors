@@ -19,14 +19,6 @@ if (!process.env.MONGO_URI) {
     console.error("❌ Missing MONGO_URI");
     process.exit(1);
 }
-if (!process.env.ADMIN_CODE) {
-    console.error("❌ Missing ADMIN_CODE in .env");
-    process.exit(1);
-}
-if (!process.env.SESSION_SECRET) {
-    console.error("❌ Missing SESSION_SECRET in .env");
-    process.exit(1);
-}
 
 // =======================
 // TRUST PROXY (required on Render for secure cookies)
@@ -38,24 +30,28 @@ app.set('trust proxy', 1);
 // =======================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(cors({ origin: true, credentials: true }));  // ← fixed: credentials must be true
+app.use(cors({ origin: true, credentials: true }));
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 
 // =======================
-// SESSION
+// SESSION (only if SECRET is set — required for admin dashboard)
 // =======================
-app.use(session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // true on Render (HTTPS)
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ← required for cross-origin cookies
-        maxAge: 8 * 60 * 60 * 1000  // 8 hours
-    }
-}));
+if (process.env.SESSION_SECRET) {
+    app.use(session({
+        secret: process.env.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 8 * 60 * 60 * 1000  // 8 hours
+        }
+    }));
+} else {
+    console.warn("⚠️  SESSION_SECRET not set — admin dashboard will be unavailable");
+}
 
 // =======================
 // RATE LIMITERS
@@ -107,8 +103,26 @@ const enquirySchema = new mongoose.Schema({
     createdAt: { type: String, default: () => new Date().toISOString() }
 });
 
-const Car     = mongoose.model('Car', carSchema);
-const Enquiry = mongoose.model('Enquiry', enquirySchema);
+const preOrderSchema = new mongoose.Schema({
+    name:         { type: String, required: true },
+    phone:        { type: String, required: true },
+    email:        String,
+    make:         { type: String, required: true },
+    model:        { type: String, required: true },
+    year:         String,
+    spec:         String,
+    color1:       String,
+    color2:       String,
+    transmission: String,
+    budget:       String,
+    extraNotes:   String,
+    status:       { type: String, default: 'new' }, // new | contacted | fulfilled
+    createdAt:    { type: String, default: () => new Date().toISOString() }
+});
+
+const Car      = mongoose.model('Car', carSchema);
+const Enquiry  = mongoose.model('Enquiry', enquirySchema);
+const PreOrder = mongoose.model('PreOrder', preOrderSchema);
 
 function carOut(c) {
     const obj = c.toObject();
@@ -121,6 +135,12 @@ function carOut(c) {
 
 function enqOut(e) {
     const obj = e.toObject();
+    obj.id = obj._id.toString();
+    return obj;
+}
+
+function preOrderOut(p) {
+    const obj = p.toObject();
     obj.id = obj._id.toString();
     return obj;
 }
@@ -139,6 +159,18 @@ function requireAdminPage(req, res, next) {
 }
 
 // =======================
+// HEALTH CHECK (cron)
+// =======================
+app.get('/health', async (req, res) => {
+    const state = mongoose.connection.readyState;
+    if (state === 1) {
+        res.status(200).json({ status: 'ok', db: 'connected' });
+    } else {
+        res.status(503).json({ status: 'error', db: 'disconnected' });
+    }
+});
+
+// =======================
 // AUTH ROUTES
 // =======================
 app.post('/api/admin/login', loginLimiter, (req, res) => {
@@ -147,7 +179,7 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
 
     if (code === process.env.ADMIN_CODE) {
         req.session.isAdmin = true;
-        req.session.save(err => {  // ← explicitly save session before responding
+        req.session.save(err => {
             if (err) return res.status(500).json({ error: 'Session error' });
             return res.json({ success: true });
         });
@@ -270,11 +302,19 @@ app.post('/api/restore', requireAdmin, async (req, res) => {
 });
 
 // =======================
+// WHATSAPP NUMBERS
+// =======================
+const WHATSAPP_NUMBERS = [
+    '260978918196',
+    '260776379305',
+];
+
+// =======================
 // ENQUIRY ROUTES
 // =======================
 app.post('/api/enquiries', async (req, res) => {
     try {
-        const { carId, carMake, carModel, carYear, name, phone, email, message } = req.body;
+        const { carId, carMake, carModel, carYear, carPrice, name, phone, email, message } = req.body;
         if (!name) return res.status(400).json({ error: "Name is required" });
 
         const enquiry = await new Enquiry({
@@ -284,7 +324,27 @@ app.post('/api/enquiries', async (req, res) => {
             message: message || null, status: 'new'
         }).save();
 
-        res.json({ success: true, id: enquiry._id });
+        const carLabel = [carYear, carMake, carModel].filter(Boolean).join(' ');
+        const priceLabel = carPrice ? `K${Number(carPrice).toLocaleString()}` : 'Price on request';
+
+        const waMessage = [
+            `Hi, I'm interested in the *${carLabel}* (${priceLabel}).`,
+            ``,
+            `*My details:*`,
+            `Name: ${name}`,
+            phone   ? `Phone: ${phone}`     : null,
+            email   ? `Email: ${email}`     : null,
+            message ? `Message: ${message}` : null,
+        ].filter(line => line !== null).join('\n');
+
+        const encodedMsg = encodeURIComponent(waMessage);
+        const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
+            number: num,
+            url: `https://wa.me/${num}?text=${encodedMsg}`
+        }));
+
+        res.json({ success: true, id: enquiry._id, whatsappLinks });
+
     } catch (err) {
         console.error('❌ ENQUIRY:', err.message);
         res.status(500).json({ error: "Failed to submit enquiry" });
@@ -325,6 +385,104 @@ app.delete('/api/enquiries/:id', requireAdmin, async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Failed to delete enquiry" });
+    }
+});
+
+// =======================
+// PRE-ORDER ROUTES
+// =======================
+app.post('/api/preorders', async (req, res) => {
+    try {
+        const { name, phone, email, make, model, year, spec, color1, color2, transmission, budget, extraNotes } = req.body;
+
+        if (!name)           return res.status(400).json({ error: 'Name required' });
+        if (!phone)          return res.status(400).json({ error: 'Phone required' });
+        if (!make || !model) return res.status(400).json({ error: 'Make and model required' });
+
+        const order = await new PreOrder({
+            name, phone,
+            email:        email        || null,
+            make:         make.trim(),
+            model:        model.trim(),
+            year:         year         || null,
+            spec:         spec         || null,
+            color1:       color1       || null,
+            color2:       color2       || null,
+            transmission: transmission || null,
+            budget:       budget       || null,
+            extraNotes:   extraNotes   || null
+        }).save();
+
+        // Build WhatsApp notification
+        const waMessage = encodeURIComponent([
+            `🚗 *NEW PRE-ORDER REQUEST*`,
+            `──────────────────────`,
+            `*Customer:* ${name}`,
+            `*Phone:* ${phone}`,
+            email        ? `*Email:* ${email}`                                               : null,
+            ``,
+            `*Car Wanted:* ${make} ${model}${year ? ` (${year})` : ''}`,
+            `*Spec:* ${spec || 'No preference'}`,
+            `*Colours:* ${[color1, color2].filter(Boolean).join(' / ') || 'Not specified'}`,
+            `*Transmission:* ${transmission || 'No preference'}`,
+            `*Budget:* ${budget ? 'K ' + budget : 'Not specified'}`,
+            extraNotes   ? `*Extra:* ${extraNotes}`                                          : null,
+        ].filter(l => l !== null).join('\n'));
+
+        const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
+            number: num,
+            url: `https://wa.me/${num}?text=${waMessage}`
+        }));
+
+        res.status(201).json({ success: true, id: order._id, whatsappLinks });
+
+    } catch (err) {
+        console.error('❌ PRE-ORDER:', err.message);
+        res.status(500).json({ error: 'Failed to submit pre-order' });
+    }
+});
+
+// Admin — list all pre-orders
+app.get('/api/preorders', requireAdmin, async (req, res) => {
+    try {
+        const orders = await PreOrder.find().sort({ createdAt: -1 });
+        res.json(orders.map(preOrderOut));
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch pre-orders' });
+    }
+});
+
+// Admin — get single pre-order
+app.get('/api/preorders/:id', requireAdmin, async (req, res) => {
+    try {
+        const order = await PreOrder.findById(req.params.id);
+        if (!order) return res.status(404).json({ error: 'Not found' });
+        res.json(preOrderOut(order));
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch pre-order' });
+    }
+});
+
+// Admin — update status: new | contacted | fulfilled
+app.put('/api/preorders/:id/status', requireAdmin, async (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!['new', 'contacted', 'fulfilled'].includes(status))
+            return res.status(400).json({ error: 'Invalid status. Use: new, contacted, fulfilled' });
+        await PreOrder.findByIdAndUpdate(req.params.id, { status });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update pre-order status' });
+    }
+});
+
+// Admin — delete pre-order
+app.delete('/api/preorders/:id', requireAdmin, async (req, res) => {
+    try {
+        await PreOrder.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete pre-order' });
     }
 });
 
@@ -392,6 +550,10 @@ app.get('/admin/dashboard', requireAdminPage, (req, res) => {
 
 app.get('/admin/enquiries', requireAdminPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin', 'que.html'));
+});
+
+app.get('/admin/preorders', requireAdminPage, (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin', 'preorders.html'));
 });
 
 // Protected static admin assets

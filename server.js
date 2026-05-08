@@ -9,7 +9,6 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const cloudinary = require('cloudinary').v2;
 const nodemailer = require('nodemailer');
 
@@ -64,7 +63,6 @@ app.use(express.urlencoded({
 }));
 
 app.use(mongoSanitize({ allowDots: true, replaceWith: '_' }));
-app.use(xss());
 
 app.use(morgan('combined'));
 

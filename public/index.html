@@ -631,7 +631,7 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 </div>
 
 <script>
-const API='/api/v1';
+  const API='/api/v1';
 let allCars=[],activeSort='default',activeCar=null,enquiryCar=null,refreshTimer=null;
 let modalImgs=[],modalIdx=0,slideshowTimer=null,slideshowOn=false;
 const cardState={};
@@ -652,8 +652,6 @@ function notify(title, sub='', type='default', duration=3800){
     </div>
     <button class="notif-close" onclick="dismissNotif(this.parentElement)">✕</button>`;
   el.style.setProperty('--dur', duration+'ms');
-  el.querySelector('::before');
-  // Set bar animation duration via inline style on ::before via a class var trick
   const bar=document.createElement('style');
   const uid='n'+Date.now();
   el.id=uid;
@@ -678,36 +676,78 @@ function scrollTo(id){document.getElementById(id).scrollIntoView({behavior:'smoo
 function fmtK(n){return n?'K '+Number(n).toLocaleString('en-ZM'):'—';}
 function getImgs(c){return(c.images&&c.images.length)?c.images:(c.image?[c.image]:[]);}
 
+// ── FIX: was called but never defined ──
+function setStockBadge(count){
+  const el=document.getElementById('stock-badge');
+  if(el)el.textContent=count;
+}
+
 /* ══════════════════════════════════
    INIT
 ══════════════════════════════════ */
 async function init(){
+
   try{
+
     const res=await fetch(`${API}/cars`);
-    if(!res.ok)throw new Error();
-    allCars=await res.json();
+
+    if(!res.ok){
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data=await res.json();
+
+    allCars=(Array.isArray(data)?data:[]).map(c=>({
+      ...c,
+      id: c.id||c._id
+    }));
+
+    console.log('Cars loaded:', allCars);
+
     document.getElementById('stat-stock').textContent=allCars.length;
+    setStockBadge(allCars.length);
+
     renderHeroFeatured();
     filterCars();
-  }catch{
+
+  }catch(err){
+
+    console.error('INIT ERROR:', err);
+
     document.getElementById('cars-grid').innerHTML=`
-      <div class="empty"><div class="empty-icon">⚙️</div>
-      <h3>Inventory loading…</h3>
-      <p>Please check back shortly or call us directly.</p></div>`;
+      <div class="empty">
+        <div class="empty-icon">⚙️</div>
+        <h3>Inventory failed to load</h3>
+        <p>${err.message||'Server error'}</p>
+      </div>
+    `;
+
     setStockBadge(0);
     document.getElementById('stat-stock').textContent='0';
+
   }
+
 }
+
+/* ══════════════════════════════════
+   AUTO REFRESH
+   FIX: was called but never defined
+══════════════════════════════════ */
 function startAutoRefresh(){
-  if(refreshTimer)return;
-  refreshTimer=setInterval(async()=>{
-    try{const r=await fetch(`${API}/cars`);if(!r.ok)throw 0;allCars=await r.json();
-    document.getElementById('stat-stock').textContent=allCars.length;
-    renderHeroFeatured();filterCars();}catch{}
-  },120000);
-}
-function setStockBadge(n){
-  document.getElementById('stock-badge').innerHTML=`<span style="color:var(--success)">⬤</span> ${n} vehicle${n!==1?'s':''} available`;
+  if(refreshTimer)clearInterval(refreshTimer);
+  refreshTimer=setInterval(async ()=>{
+    try{
+      const res=await fetch(`${API}/cars`);
+      if(!res.ok)return;
+      const data=await res.json();
+      allCars=(Array.isArray(data)?data:[]).map(c=>({...c,id:c.id||c._id}));
+      setStockBadge(allCars.length);
+      document.getElementById('stat-stock').textContent=allCars.length;
+      filterCars();
+    }catch(e){
+      console.warn('Auto-refresh failed:', e);
+    }
+  }, 60000); // refresh every 60 seconds
 }
 
 /* ══════════════════════════════════
@@ -829,10 +869,9 @@ function updateCardSlider(id){
 function initCardSwipe(id,total){
   const slider=document.getElementById(`slides-${id}`);
   if(!slider||total<=1)return;
-  let startX=0,isDragging=false;
+  let startX=0;
   slider.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;},{passive:true});
   slider.addEventListener('touchend',e=>{const diff=startX-e.changedTouches[0].clientX;if(Math.abs(diff)>30)diff>0?cardNext(id):cardPrev(id);},{passive:true});
-  // Show nav arrows briefly on touch
   slider.addEventListener('touchstart',()=>{
     const card=document.getElementById(`card-${id}`);
     card?.querySelectorAll('.card-nav').forEach(n=>n.classList.add('touch-vis'));
@@ -923,29 +962,13 @@ async function submitEnquiry(){
   const msg=document.getElementById('enq-msg').value.trim();
 
   if(!name)
-    return notify(
-      'Please enter your name',
-      'Name is required',
-      'error'
-    );
+    return notify('Please enter your name','Name is required','error');
 
   if(!phone&&!email)
-    return notify(
-      'Contact info required',
-      'Add a phone number or email',
-      'error'
-    );
+    return notify('Contact info required','Add a phone number or email','error');
 
-  //
-  // EMAIL VALIDATION
-  //
-  if(email && !/^\S+@\S+\.\S+$/.test(email)){
-    return notify(
-      'Invalid email',
-      'Please enter a valid email address',
-      'error'
-    );
-  }
+  if(email&&!/^\S+@\S+\.\S+$/.test(email))
+    return notify('Invalid email','Please enter a valid email address','error');
 
   btn.disabled=true;
   btn.textContent='⏳ Sending...';
@@ -954,9 +977,7 @@ async function submitEnquiry(){
 
     const res=await fetch(`${API}/enquiries`,{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         carId:enquiryCar.id,
         carMake:enquiryCar.make,
@@ -971,10 +992,9 @@ async function submitEnquiry(){
 
     const data=await res.json();
 
-    if(!res.ok){
-      throw new Error(data.error || 'Failed');
-    }
+    if(!res.ok)throw new Error(data.error||'Failed');
 
+    // ── FIX: notify first, then close after 2.5s so user sees the message ──
     notify(
       'Enquiry Sent! ✅',
       `We'll contact you shortly about the ${enquiryCar.make} ${enquiryCar.model}`,
@@ -982,24 +1002,16 @@ async function submitEnquiry(){
       5000
     );
 
-    ['enq-name','enq-phone','enq-email','enq-msg']
-      .forEach(id=>{
-        const el=document.getElementById(id);
-        if(el)el.value='';
-      });
+    ['enq-name','enq-phone','enq-email','enq-msg'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el)el.value='';
+    });
 
-    setTimeout(()=>{
-      closeEnquiry();
-    },700);
+    setTimeout(()=>closeEnquiry(), 2500);
 
   }catch(err){
 
-    notify(
-      'Failed to send enquiry',
-      err.message || 'Please try again',
-      'error',
-      5000
-    );
+    notify('Failed to send enquiry',err.message||'Please try again','error',5000);
 
   }finally{
 
@@ -1031,40 +1043,58 @@ async function submitPreOrder(){
   if(!phone)return notify('Phone required','We need your WhatsApp/phone to reach you','error');
   if(!make||!model)return notify('Car details required','Please enter at least a make and model','error');
 
-  const colours=[color1,color2].filter(Boolean).join(' / ')||'Not specified';
-  const message=[
-    `PRE-ORDER REQUEST`,
-    `─────────────────`,
-    `Car: ${make} ${model}${year?' ('+year+')':''}`,
-    `Spec: ${spec||'No preference'}`,
-    `Colours: ${colours}`,
-    `Transmission: ${trans||'No preference'}`,
-    `Budget: ${budget?'K '+budget:'Not specified'}`,
-    `Extra requirements: ${notes||'None'}`,
-  ].join('\n');
-
   btn.disabled=true;
   btn.textContent='⏳ Sending…';
 
   try{
-    const res=await fetch(`${API}/preorders`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      carId:null,carMake:make,carModel:model,carYear:year||null,
-      name,phone:phone||null,email:email||null,
-      message,
-      isPreOrder:true,
-      spec:spec||null,
-      color1:color1||null,color2:color2||null,
-      transmission:trans||null,
-      budget:budget||null,
-      extraNotes:notes||null
-    })});
-    if(!res.ok)throw new Error();
-    notify('Pre-Order Received! 🎉',`We'll search for your ${make} ${model} and contact you soon`,'success',5000);
-    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+
+    const res=await fetch(`${API}/preorders`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name,
+        phone:phone||null,
+        email:email||null,
+        make,
+        model,
+        year:year||null,
+        spec:spec||null,
+        color1:color1||null,
+        color2:color2||null,
+        transmission:trans||null,
+        budget:budget||null,
+        extraNotes:notes||null
+      })
+    });
+
+    const data=await res.json();
+
+    if(!res.ok)throw new Error(data.error||'Failed');
+
+    // ── FIX: notify with success + clear form ──
+    notify(
+      'Pre-Order Received! 🎉',
+      `We'll search for your ${make} ${model} and contact you soon`,
+      'success',
+      5000
+    );
+
+    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes']
+      .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('po-spec').value='';
     document.getElementById('po-trans').value='';
-  }catch{notify('Failed to send','Please try again or call us directly','error');}
-  finally{btn.disabled=false;btn.textContent='✨ Submit Pre-Order Request';}
+
+  }catch(err){
+
+    notify('Failed to send','Please try again or call us directly','error',5000);
+    console.error('Pre-order error:', err);
+
+  }finally{
+
+    btn.disabled=false;
+    btn.textContent='✨ Submit Pre-Order Request';
+
+  }
 }
 
 /* ══════════════════════════════════

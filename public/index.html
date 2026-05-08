@@ -631,7 +631,7 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 </div>
 
 <script>
-const API='/api';
+const API='/api/v1';
 let allCars=[],activeSort='default',activeCar=null,enquiryCar=null,refreshTimer=null;
 let modalImgs=[],modalIdx=0,slideshowTimer=null,slideshowOn=false;
 const cardState={};
@@ -914,18 +914,99 @@ function closeEnquiry(){document.getElementById('enquiry-overlay').classList.rem
 document.getElementById('enquiry-overlay').addEventListener('click',function(e){if(e.target===this)closeEnquiry();});
 
 async function submitEnquiry(){
+
+  const btn=document.querySelector('#enquiry-overlay .btn-modal-primary');
+
   const name=document.getElementById('enq-name').value.trim();
   const phone=document.getElementById('enq-phone').value.trim();
   const email=document.getElementById('enq-email').value.trim();
   const msg=document.getElementById('enq-msg').value.trim();
-  if(!name)return notify('Please enter your name','Name is required','error');
-  if(!phone&&!email)return notify('Contact info required','Add a phone number or email','error');
+
+  if(!name)
+    return notify(
+      'Please enter your name',
+      'Name is required',
+      'error'
+    );
+
+  if(!phone&&!email)
+    return notify(
+      'Contact info required',
+      'Add a phone number or email',
+      'error'
+    );
+
+  //
+  // EMAIL VALIDATION
+  //
+  if(email && !/^\S+@\S+\.\S+$/.test(email)){
+    return notify(
+      'Invalid email',
+      'Please enter a valid email address',
+      'error'
+    );
+  }
+
+  btn.disabled=true;
+  btn.textContent='⏳ Sending...';
+
   try{
-    const res=await fetch(`${API}/enquiries`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({carId:enquiryCar.id,carMake:enquiryCar.make,carModel:enquiryCar.model,carYear:enquiryCar.year||null,name,phone:phone||null,email:email||null,message:msg||`Enquiry for ${enquiryCar.make} ${enquiryCar.model}`})});
-    if(!res.ok)throw new Error();
-    notify('Enquiry Sent!',`We'll be in touch about the ${enquiryCar.make} ${enquiryCar.model}`,'success');
-    closeEnquiry();
-  }catch{notify('Failed to send','Please try again or call us','error');}
+
+    const res=await fetch(`${API}/enquiries`,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        carId:enquiryCar.id,
+        carMake:enquiryCar.make,
+        carModel:enquiryCar.model,
+        carYear:enquiryCar.year||null,
+        name,
+        phone:phone||null,
+        email:email||null,
+        message:msg||`Enquiry for ${enquiryCar.make} ${enquiryCar.model}`
+      })
+    });
+
+    const data=await res.json();
+
+    if(!res.ok){
+      throw new Error(data.error || 'Failed');
+    }
+
+    notify(
+      'Enquiry Sent! ✅',
+      `We'll contact you shortly about the ${enquiryCar.make} ${enquiryCar.model}`,
+      'success',
+      5000
+    );
+
+    ['enq-name','enq-phone','enq-email','enq-msg']
+      .forEach(id=>{
+        const el=document.getElementById(id);
+        if(el)el.value='';
+      });
+
+    setTimeout(()=>{
+      closeEnquiry();
+    },700);
+
+  }catch(err){
+
+    notify(
+      'Failed to send enquiry',
+      err.message || 'Please try again',
+      'error',
+      5000
+    );
+
+  }finally{
+
+    btn.disabled=false;
+    btn.textContent='📨 Send Enquiry';
+
+  }
 }
 
 /* ══════════════════════════════════
@@ -950,47 +1031,40 @@ async function submitPreOrder(){
   if(!phone)return notify('Phone required','We need your WhatsApp/phone to reach you','error');
   if(!make||!model)return notify('Car details required','Please enter at least a make and model','error');
 
+  const colours=[color1,color2].filter(Boolean).join(' / ')||'Not specified';
+  const message=[
+    `PRE-ORDER REQUEST`,
+    `─────────────────`,
+    `Car: ${make} ${model}${year?' ('+year+')':''}`,
+    `Spec: ${spec||'No preference'}`,
+    `Colours: ${colours}`,
+    `Transmission: ${trans||'No preference'}`,
+    `Budget: ${budget?'K '+budget:'Not specified'}`,
+    `Extra requirements: ${notes||'None'}`,
+  ].join('\n');
+
   btn.disabled=true;
   btn.textContent='⏳ Sending…';
 
   try{
-    const res=await fetch(`${API}/preorders`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        name,
-        phone,
-        email:        email || null,
-        make,
-        model,
-        year:         year  || null,
-        spec:         spec  || null,
-        color1:       color1|| null,
-        color2:       color2|| null,
-        transmission: trans || null,
-        budget:       budget|| null,
-        extraNotes:   notes || null
-      })
-    });
-
-    const data=await res.json();
-    if(!res.ok) throw new Error(data.error||'Server error');
-
+    const res=await fetch(`${API}/preorders`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      carId:null,carMake:make,carModel:model,carYear:year||null,
+      name,phone:phone||null,email:email||null,
+      message,
+      isPreOrder:true,
+      spec:spec||null,
+      color1:color1||null,color2:color2||null,
+      transmission:trans||null,
+      budget:budget||null,
+      extraNotes:notes||null
+    })});
+    if(!res.ok)throw new Error();
     notify('Pre-Order Received! 🎉',`We'll search for your ${make} ${model} and contact you soon`,'success',5000);
-
-    // Clear all fields
-    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes']
-      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('po-spec').value='';
     document.getElementById('po-trans').value='';
-
-  } catch(err) {
-    console.error('Pre-order error:',err);
-    notify('Failed to send','Please try again or call us directly','error');
-  } finally {
-    btn.disabled=false;
-    btn.textContent='✨ Submit Pre-Order Request';
-  }
+  }catch{notify('Failed to send','Please try again or call us directly','error');}
+  finally{btn.disabled=false;btn.textContent='✨ Submit Pre-Order Request';}
 }
 
 /* ══════════════════════════════════

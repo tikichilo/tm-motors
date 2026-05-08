@@ -505,15 +505,10 @@ app.use((req, res) => {
 //
 
 app.use((err, req, res, next) => {
-
-    console.error(err);
-
+    console.error('ROUTE ERROR:', err);
     res.status(err.status || 500).json({
-        error: process.env.NODE_ENV === 'production'
-            ? 'Internal server error'
-            : err.message
+        error: err.message  // ← always show real error for now
     });
-
 });
 
 //

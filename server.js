@@ -8,7 +8,6 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
 const cloudinary = require('cloudinary').v2;
 const nodemailer = require('nodemailer');
 
@@ -61,8 +60,6 @@ app.use(express.urlencoded({
     extended: true,
     limit: '10mb'
 }));
-
-app.use(mongoSanitize({ allowDots: true, replaceWith: '_' }));
 
 app.use(morgan('combined'));
 

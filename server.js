@@ -5,561 +5,539 @@ const cors = require('cors');
 const path = require('path');
 const mongoose = require('mongoose');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
-const session = require('express-session');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const cloudinary = require('cloudinary').v2;
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// =======================
-// ENV CHECKS
-// =======================
-if (!process.env.MONGO_URI) {
-    console.error("❌ Missing MONGO_URI");
-    process.exit(1);
-}
-
-// =======================
-// TRUST PROXY (required on Render for secure cookies)
-// =======================
 app.set('trust proxy', 1);
 
+//
+// =======================
+// ENV VALIDATION
+// =======================
+//
+
+const requiredEnv = [
+    'MONGO_URI',
+    'CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_API_KEY',
+    'CLOUDINARY_API_SECRET',
+    'EMAIL_USER',
+    'EMAIL_PASS'
+];
+
+requiredEnv.forEach((key) => {
+    if (!process.env[key]) {
+        console.error(`❌ Missing ENV: ${key}`);
+        process.exit(1);
+    }
+});
+
+//
 // =======================
 // MIDDLEWARE
 // =======================
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(cors({ origin: true, credentials: true }));
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(morgan('dev'));
+//
 
-// =======================
-// SESSION (only if SECRET is set — required for admin dashboard)
-// =======================
-if (process.env.SESSION_SECRET) {
-    app.use(session({
-        secret: process.env.SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
-        cookie: {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-            maxAge: 8 * 60 * 60 * 1000  // 8 hours
-        }
-    }));
-} else {
-    console.warn("⚠️  SESSION_SECRET not set — admin dashboard will be unavailable");
-}
+app.use(helmet());
 
-// =======================
-// RATE LIMITERS
-// =======================
-app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }));
+app.use(cors({
+    origin: process.env.CLIENT_URL || '*'
+}));
 
-const loginLimiter = rateLimit({
+app.use(compression());
+
+app.use(express.json({
+    limit: '10mb'
+}));
+
+app.use(express.urlencoded({
+    extended: true,
+    limit: '10mb'
+}));
+
+app.use(mongoSanitize());
+app.use(xss());
+
+app.use(morgan('combined'));
+
+//
+// =======================
+// RATE LIMITER
+// =======================
+//
+
+const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: { error: 'Too many attempts. Try again in 15 minutes.' }
+    max: 100,
+    message: {
+        error: 'Too many requests, please try again later.'
+    }
 });
 
+app.use('/api', apiLimiter);
+
+//
+// =======================
+// CLOUDINARY
+// =======================
+//
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+//
+// =======================
+// MAILER
+// =======================
+//
+
+const transporter = nodemailer.createTransport({
+    service: 'hotmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+async function sendNotification(subject, html) {
+    try {
+        await transporter.sendMail({
+            from: `"T&M Motors" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
+            subject,
+            html
+        });
+    } catch (err) {
+        // Log but don't crash the request if email fails
+        console.error('❌ Email send failed:', err.message);
+    }
+}
+
+//
 // =======================
 // DATABASE
 // =======================
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ MongoDB connected'))
-    .catch(err => { console.error('❌ MongoDB error:', err.message); process.exit(1); });
+//
 
+mongoose.connect(process.env.MONGO_URI);
+
+mongoose.connection.on('connected', () => {
+    console.log('✅ MongoDB connected');
+});
+
+mongoose.connection.on('error', (err) => {
+    console.error('❌ MongoDB Error:', err.message);
+});
+
+//
 // =======================
 // SCHEMAS
 // =======================
+//
+
 const carSchema = new mongoose.Schema({
-    make:        { type: String, required: true },
-    model:       { type: String, required: true },
-    year:        Number,
-    price:       { type: Number, required: true },
-    mileage:     Number,
-    color:       String,
-    description: String,
-    image:       String,
-    images:      [String],
-    status:      { type: String, default: 'available' },
-    soldDate:    String,
-    createdAt:   { type: String, default: () => new Date().toISOString() }
+    make: {
+        type: String,
+        required: true,
+        trim: true
+    },
+
+    model: {
+        type: String,
+        required: true,
+        trim: true
+    },
+
+    year: {
+        type: Number,
+        min: 1900,
+        max: 2100
+    },
+
+    price: {
+        type: Number,
+        required: true,
+        min: 0
+    },
+
+    mileage: {
+        type: Number,
+        min: 0
+    },
+
+    color: String,
+
+    description: {
+        type: String,
+        maxlength: 5000
+    },
+
+    image: String,
+
+    images: {
+        type: [String],
+        default: []
+    },
+
+    status: {
+        type: String,
+        enum: ['available', 'sold', 'reserved'],
+        default: 'available'
+    }
+
+}, {
+    timestamps: true
+});
+
+carSchema.index({
+    make: 1,
+    model: 1
 });
 
 const enquirySchema = new mongoose.Schema({
-    carId:     { type: String, default: null },
-    carMake:   String,
-    carModel:  String,
-    carYear:   Number,
-    name:      { type: String, required: true },
-    phone:     String,
-    email:     String,
-    message:   String,
-    status:    { type: String, default: 'new' },
-    repliedAt: String,
-    createdAt: { type: String, default: () => new Date().toISOString() }
+
+    carId: mongoose.Schema.Types.ObjectId,
+
+    carMake: String,
+
+    carModel: String,
+
+    carYear: Number,
+
+    name: {
+        type: String,
+        required: true,
+        trim: true
+    },
+
+    phone: String,
+
+    email: {
+        type: String,
+        lowercase: true
+    },
+
+    message: {
+        type: String,
+        maxlength: 3000
+    },
+
+    status: {
+        type: String,
+        enum: ['new', 'contacted', 'closed'],
+        default: 'new'
+    }
+
+}, {
+    timestamps: true
 });
 
 const preOrderSchema = new mongoose.Schema({
-    name:         { type: String, required: true },
-    phone:        { type: String, required: true },
-    email:        String,
-    make:         { type: String, required: true },
-    model:        { type: String, required: true },
-    year:         String,
-    spec:         String,
-    color1:       String,
-    color2:       String,
+
+    name: {
+        type: String,
+        required: true
+    },
+
+    phone: String,
+
+    email: String,
+
+    make: {
+        type: String,
+        required: true
+    },
+
+    model: {
+        type: String,
+        required: true
+    },
+
+    year: String,
+
+    spec: String,
+
     transmission: String,
-    budget:       String,
-    extraNotes:   String,
-    status:       { type: String, default: 'new' }, // new | contacted | fulfilled
-    createdAt:    { type: String, default: () => new Date().toISOString() }
+
+    color1: String,
+
+    color2: String,
+
+    budget: String,
+
+    extraNotes: String,
+
+    status: {
+        type: String,
+        default: 'new'
+    }
+
+}, {
+    timestamps: true
 });
 
-const Car      = mongoose.model('Car', carSchema);
-const Enquiry  = mongoose.model('Enquiry', enquirySchema);
+//
+// =======================
+// MODELS
+// =======================
+//
+
+const Car = mongoose.model('Car', carSchema);
+const Enquiry = mongoose.model('Enquiry', enquirySchema);
 const PreOrder = mongoose.model('PreOrder', preOrderSchema);
 
-function carOut(c) {
-    const obj = c.toObject();
-    obj.id = obj._id.toString();
-    if (!obj.images || !obj.images.length) {
-        obj.images = obj.image ? [obj.image] : [];
-    }
-    return obj;
-}
-
-function enqOut(e) {
-    const obj = e.toObject();
-    obj.id = obj._id.toString();
-    return obj;
-}
-
-function preOrderOut(p) {
-    const obj = p.toObject();
-    obj.id = obj._id.toString();
-    return obj;
-}
-
+//
 // =======================
-// AUTH MIDDLEWARE
+// HELPERS
 // =======================
-function requireAdmin(req, res, next) {
-    if (req.session && req.session.isAdmin) return next();
-    res.status(401).json({ error: 'Unauthorized — please log in at /admin/login' });
+//
+
+function asyncHandler(fn) {
+    return (req, res, next) => {
+        Promise.resolve(fn(req, res, next))
+            .catch(next);
+    };
 }
 
-function requireAdminPage(req, res, next) {
-    if (req.session && req.session.isAdmin) return next();
-    res.redirect('/admin/login');
+function carOut(car) {
+    return {
+        id: car._id,
+        make: car.make,
+        model: car.model,
+        year: car.year,
+        price: car.price,
+        mileage: car.mileage,
+        color: car.color,
+        description: car.description,
+        image: car.image,
+        images: car.images?.length
+            ? car.images
+            : [car.image],
+        status: car.status,
+        createdAt: car.createdAt
+    };
 }
 
+//
 // =======================
-// HEALTH CHECK (cron)
+// HEALTH CHECK
 // =======================
-app.get('/health', async (req, res) => {
-    const state = mongoose.connection.readyState;
-    if (state === 1) {
-        res.status(200).json({ status: 'ok', db: 'connected' });
-    } else {
-        res.status(503).json({ status: 'error', db: 'disconnected' });
-    }
+//
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        uptime: process.uptime()
+    });
 });
 
+//
 // =======================
-// AUTH ROUTES
+// GET CARS
 // =======================
-app.post('/api/admin/login', loginLimiter, (req, res) => {
-    const { code } = req.body;
-    if (!code) return res.status(400).json({ error: 'Code required' });
+//
 
-    if (code === process.env.ADMIN_CODE) {
-        req.session.isAdmin = true;
-        req.session.save(err => {
-            if (err) return res.status(500).json({ error: 'Session error' });
-            return res.json({ success: true });
+app.get('/api/v1/cars', asyncHandler(async (req, res) => {
+
+    const cars = await Car.find({
+        status: 'available'
+    }).sort({
+        createdAt: -1
+    });
+
+    res.json(cars.map(car => ({
+        id: car._id.toString(),
+
+        make: car.make,
+        model: car.model,
+        year: car.year,
+
+        price: car.price || 0,
+        mileage: car.mileage || 0,
+
+        color: car.color || '',
+        description: car.description || '',
+
+        image: car.image || '',
+
+        images: Array.isArray(car.images) && car.images.length
+            ? car.images
+            : (car.image ? [car.image] : []),
+
+        status: car.status || 'available',
+
+        createdAt: car.createdAt
+    })));
+
+}));
+
+//
+// =======================
+// GET SINGLE CAR
+// =======================
+//
+
+app.get('/api/v1/cars/:id', asyncHandler(async (req, res) => {
+
+    const car = await Car.findById(req.params.id);
+
+    if (!car) {
+        return res.status(404).json({
+            error: 'Car not found'
         });
-    } else {
-        return res.status(401).json({ error: 'Invalid code' });
     }
-});
 
-app.post('/api/admin/logout', (req, res) => {
-    req.session.destroy(() => res.json({ success: true }));
-});
+    res.json(carOut(car));
 
-app.get('/api/admin/check', (req, res) => {
-    res.json({ authenticated: !!(req.session && req.session.isAdmin) });
-});
+}));
 
+//
 // =======================
-// CAR ROUTES
+// CREATE ENQUIRY
 // =======================
-app.get('/api/cars', async (req, res) => {
-    try {
-        const cars = await Car.find({ status: 'available' }).sort({ createdAt: -1 });
-        res.json(cars.map(carOut));
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch cars" });
-    }
-});
+//
 
-app.get('/api/cars/:id', async (req, res) => {
-    try {
-        const car = await Car.findById(req.params.id);
-        if (!car) return res.status(404).json({ error: "Not found" });
-        res.json(carOut(car));
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch car" });
-    }
-});
+app.post('/api/v1/enquiries', asyncHandler(async (req, res) => {
 
-app.post('/api/cars', requireAdmin, async (req, res) => {
-    try {
-        const { make, model, year, price, mileage, color, description, image, images } = req.body;
-        if (!make || !model || !price) return res.status(400).json({ error: "Make, model, price required" });
+    const enquiry = await Enquiry.create(req.body);
 
-        let imgs = [];
-        if (Array.isArray(images) && images.length) imgs = images.slice(0, 10);
-        else if (image) imgs = [image];
+    await sendNotification(
+        '🚗 New Enquiry — T&M Motors',
+        `<h2>New Enquiry Received</h2>
+         <p><strong>Name:</strong> ${enquiry.name}</p>
+         <p><strong>Phone:</strong> ${enquiry.phone || 'Not provided'}</p>
+         <p><strong>Email:</strong> ${enquiry.email || 'Not provided'}</p>
+         <p><strong>Car:</strong> ${enquiry.carMake || ''} ${enquiry.carModel || ''}${enquiry.carYear ? ' (' + enquiry.carYear + ')' : ''}</p>
+         <p><strong>Message:</strong> ${enquiry.message || 'No message'}</p>`
+    );
 
-        const car = await new Car({
-            make: make.trim(), model: model.trim(),
-            year: year ? Number(year) : null,
-            price: Number(price),
-            mileage: mileage ? Number(mileage) : null,
-            color: color || null, description: description || null,
-            image: imgs[0] || null, images: imgs
-        }).save();
+    res.status(201).json({
+        success: true,
+        id: enquiry._id
+    });
 
-        res.status(201).json({ success: true, ...carOut(car) });
-    } catch (err) {
-        console.error('❌ ADD CAR:', err.message);
-        res.status(500).json({ error: "Failed to add car" });
-    }
-});
+}));
 
-app.put('/api/cars/:id', requireAdmin, async (req, res) => {
-    try {
-        const { make, model, year, price, mileage, color, description, image, images } = req.body;
-        let imgs = [];
-        if (Array.isArray(images) && images.length) imgs = images.slice(0, 10);
-        else if (image) imgs = [image];
+//
+// =======================
+// CREATE PRE-ORDER
+// =======================
+//
 
-        await Car.findByIdAndUpdate(req.params.id, {
-            make, model,
-            year: year ? Number(year) : null,
-            price: Number(price),
-            mileage: mileage ? Number(mileage) : null,
-            color, description,
-            image: imgs[0] || null,
-            images: imgs
+app.post('/api/v1/preorders', asyncHandler(async (req, res) => {
+
+    const preOrder = await PreOrder.create(req.body);
+
+    await sendNotification(
+        '✨ New Pre-Order Request — T&M Motors',
+        `<h2>New Pre-Order Received</h2>
+         <p><strong>Name:</strong> ${preOrder.name}</p>
+         <p><strong>Phone:</strong> ${preOrder.phone || 'Not provided'}</p>
+         <p><strong>Email:</strong> ${preOrder.email || 'Not provided'}</p>
+         <p><strong>Car:</strong> ${preOrder.make} ${preOrder.model}${preOrder.year ? ' (' + preOrder.year + ')' : ''}</p>
+         <p><strong>Spec:</strong> ${preOrder.spec || 'No preference'}</p>
+         <p><strong>Transmission:</strong> ${preOrder.transmission || 'No preference'}</p>
+         <p><strong>Colours:</strong> ${[preOrder.color1, preOrder.color2].filter(Boolean).join(' / ') || 'Not specified'}</p>
+         <p><strong>Budget:</strong> ${preOrder.budget ? 'K ' + preOrder.budget : 'Not specified'}</p>
+         <p><strong>Extra Notes:</strong> ${preOrder.extraNotes || 'None'}</p>`
+    );
+
+    res.status(201).json({
+        success: true,
+        id: preOrder._id
+    });
+
+}));
+
+//
+// =======================
+// CLOUDINARY IMAGE UPLOAD
+// =======================
+//
+
+app.post('/api/v1/upload', asyncHandler(async (req, res) => {
+
+    const { image } = req.body;
+
+    if (!image) {
+        return res.status(400).json({
+            error: 'Image required'
         });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to update car" });
     }
-});
 
-app.delete('/api/cars/:id', requireAdmin, async (req, res) => {
-    try {
-        await Car.findByIdAndDelete(req.params.id);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to delete car" });
-    }
-});
+    const upload = await cloudinary.uploader.upload(image, {
+        folder: 'tm-motors'
+    });
 
-app.post('/api/sell', requireAdmin, async (req, res) => {
-    try {
-        await Car.findByIdAndUpdate(req.body.id, { status: 'sold', soldDate: new Date().toISOString() });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to sell car" });
-    }
-});
+    res.json({
+        url: upload.secure_url
+    });
 
-app.get('/api/sold', requireAdmin, async (req, res) => {
-    try {
-        const sold = await Car.find({ status: 'sold' }).sort({ soldDate: -1 });
-        res.json(sold.map(carOut));
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch sold cars" });
-    }
-});
+}));
 
-app.post('/api/restore', requireAdmin, async (req, res) => {
-    try {
-        await Car.findByIdAndUpdate(req.body.id, { status: 'available', soldDate: null });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Restore failed" });
-    }
-});
-
+//
 // =======================
-// WHATSAPP NUMBERS
+// STATIC FILES
 // =======================
-const WHATSAPP_NUMBERS = [
-    '260978918196',
-    '260776379305',
-];
+//
 
-// =======================
-// ENQUIRY ROUTES
-// =======================
-app.post('/api/enquiries', async (req, res) => {
-    try {
-        const { carId, carMake, carModel, carYear, carPrice, name, phone, email, message } = req.body;
-        if (!name) return res.status(400).json({ error: "Name is required" });
-
-        const enquiry = await new Enquiry({
-            carId: carId || null, carMake: carMake || null,
-            carModel: carModel || null, carYear: carYear || null,
-            name, phone: phone || null, email: email || null,
-            message: message || null, status: 'new'
-        }).save();
-
-        const carLabel = [carYear, carMake, carModel].filter(Boolean).join(' ');
-        const priceLabel = carPrice ? `K${Number(carPrice).toLocaleString()}` : 'Price on request';
-
-        const waMessage = [
-            `Hi, I'm interested in the *${carLabel}* (${priceLabel}).`,
-            ``,
-            `*My details:*`,
-            `Name: ${name}`,
-            phone   ? `Phone: ${phone}`     : null,
-            email   ? `Email: ${email}`     : null,
-            message ? `Message: ${message}` : null,
-        ].filter(line => line !== null).join('\n');
-
-        const encodedMsg = encodeURIComponent(waMessage);
-        const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
-            number: num,
-            url: `https://wa.me/${num}?text=${encodedMsg}`
-        }));
-
-        res.json({ success: true, id: enquiry._id, whatsappLinks });
-
-    } catch (err) {
-        console.error('❌ ENQUIRY:', err.message);
-        res.status(500).json({ error: "Failed to submit enquiry" });
-    }
-});
-
-app.get('/api/enquiries', requireAdmin, async (req, res) => {
-    try {
-        const data = await Enquiry.find().sort({ createdAt: -1 });
-        res.json(data.map(enqOut));
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch enquiries" });
-    }
-});
-
-app.get('/api/enquiries/:id', requireAdmin, async (req, res) => {
-    try {
-        const e = await Enquiry.findById(req.params.id);
-        if (!e) return res.status(404).json({ error: "Not found" });
-        res.json(enqOut(e));
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch enquiry" });
-    }
-});
-
-app.put('/api/enquiries/:id/replied', requireAdmin, async (req, res) => {
-    try {
-        await Enquiry.findByIdAndUpdate(req.params.id, { status: 'replied', repliedAt: new Date().toISOString() });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to update enquiry" });
-    }
-});
-
-app.delete('/api/enquiries/:id', requireAdmin, async (req, res) => {
-    try {
-        await Enquiry.findByIdAndDelete(req.params.id);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to delete enquiry" });
-    }
-});
-
-// =======================
-// PRE-ORDER ROUTES
-// =======================
-app.post('/api/preorders', async (req, res) => {
-    try {
-        const { name, phone, email, make, model, year, spec, color1, color2, transmission, budget, extraNotes } = req.body;
-
-        if (!name)           return res.status(400).json({ error: 'Name required' });
-        if (!phone)          return res.status(400).json({ error: 'Phone required' });
-        if (!make || !model) return res.status(400).json({ error: 'Make and model required' });
-
-        const order = await new PreOrder({
-            name, phone,
-            email:        email        || null,
-            make:         make.trim(),
-            model:        model.trim(),
-            year:         year         || null,
-            spec:         spec         || null,
-            color1:       color1       || null,
-            color2:       color2       || null,
-            transmission: transmission || null,
-            budget:       budget       || null,
-            extraNotes:   extraNotes   || null
-        }).save();
-
-        // Build WhatsApp notification
-        const waMessage = encodeURIComponent([
-            `🚗 *NEW PRE-ORDER REQUEST*`,
-            `──────────────────────`,
-            `*Customer:* ${name}`,
-            `*Phone:* ${phone}`,
-            email        ? `*Email:* ${email}`                                               : null,
-            ``,
-            `*Car Wanted:* ${make} ${model}${year ? ` (${year})` : ''}`,
-            `*Spec:* ${spec || 'No preference'}`,
-            `*Colours:* ${[color1, color2].filter(Boolean).join(' / ') || 'Not specified'}`,
-            `*Transmission:* ${transmission || 'No preference'}`,
-            `*Budget:* ${budget ? 'K ' + budget : 'Not specified'}`,
-            extraNotes   ? `*Extra:* ${extraNotes}`                                          : null,
-        ].filter(l => l !== null).join('\n'));
-
-        const whatsappLinks = WHATSAPP_NUMBERS.map(num => ({
-            number: num,
-            url: `https://wa.me/${num}?text=${waMessage}`
-        }));
-
-        res.status(201).json({ success: true, id: order._id, whatsappLinks });
-
-    } catch (err) {
-        console.error('❌ PRE-ORDER:', err.message);
-        res.status(500).json({ error: 'Failed to submit pre-order' });
-    }
-});
-
-// Admin — list all pre-orders
-app.get('/api/preorders', requireAdmin, async (req, res) => {
-    try {
-        const orders = await PreOrder.find().sort({ createdAt: -1 });
-        res.json(orders.map(preOrderOut));
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch pre-orders' });
-    }
-});
-
-// Admin — get single pre-order
-app.get('/api/preorders/:id', requireAdmin, async (req, res) => {
-    try {
-        const order = await PreOrder.findById(req.params.id);
-        if (!order) return res.status(404).json({ error: 'Not found' });
-        res.json(preOrderOut(order));
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch pre-order' });
-    }
-});
-
-// Admin — update status: new | contacted | fulfilled
-app.put('/api/preorders/:id/status', requireAdmin, async (req, res) => {
-    try {
-        const { status } = req.body;
-        if (!['new', 'contacted', 'fulfilled'].includes(status))
-            return res.status(400).json({ error: 'Invalid status. Use: new, contacted, fulfilled' });
-        await PreOrder.findByIdAndUpdate(req.params.id, { status });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to update pre-order status' });
-    }
-});
-
-// Admin — delete pre-order
-app.delete('/api/preorders/:id', requireAdmin, async (req, res) => {
-    try {
-        await PreOrder.findByIdAndDelete(req.params.id);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to delete pre-order' });
-    }
-});
-
-// =======================
-// ANALYTICS
-// =======================
-app.get('/api/analytics/enquiries-per-day', requireAdmin, async (req, res) => {
-    try {
-        const data = await Enquiry.aggregate([
-            { $group: { _id: { $substr: ["$createdAt", 0, 10] }, total: { $sum: 1 } } },
-            { $sort: { _id: 1 } },
-            { $project: { date: "$_id", total: 1, _id: 0 } }
-        ]);
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ error: "Analytics failed" });
-    }
-});
-
-app.get('/api/analytics/top-cars', requireAdmin, async (req, res) => {
-    try {
-        const data = await Enquiry.aggregate([
-            { $group: { _id: "$carId", make: { $first: "$carMake" }, model: { $first: "$carModel" }, total: { $sum: 1 } } },
-            { $sort: { total: -1 } }, { $limit: 5 }
-        ]);
-        res.json(data.map(d => ({ id: d._id, make: d.make || '?', model: d.model || '?', total: d.total })));
-    } catch (err) {
-        res.status(500).json({ error: "Analytics failed" });
-    }
-});
-
-app.get('/api/analytics/conversion', requireAdmin, async (req, res) => {
-    try {
-        const enquiries = await Enquiry.countDocuments();
-        const sold      = await Car.countDocuments({ status: 'sold' });
-        res.json({ enquiries, sold, conversionRate: enquiries ? ((sold / enquiries) * 100).toFixed(1) : 0 });
-    } catch (err) {
-        res.status(500).json({ error: "Analytics failed" });
-    }
-});
-
-// =======================
-// STATIC + PAGE ROUTES
-// =======================
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => {
-    const f = path.join(__dirname, 'public', 'index.html');
-    res.sendFile(f, err => { if (err) res.json({ status: "T&M Motors API running" }); });
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Login — public
-app.get('/admin/login', (req, res) => {
-    if (req.session && req.session.isAdmin) return res.redirect('/admin/dashboard');
-    res.sendFile(path.join(__dirname, 'admin', 'login.html'));
+//
+// =======================
+// GLOBAL ERROR HANDLER
+// =======================
+//
+
+app.use((err, req, res, next) => {
+
+    console.error(err);
+
+    res.status(err.status || 500).json({
+        error: process.env.NODE_ENV === 'production'
+            ? 'Internal server error'
+            : err.message
+    });
+
 });
 
-// /admin root → login
-app.get('/admin', (req, res) => res.redirect('/admin/login'));
+//
+// =======================
+// GRACEFUL SHUTDOWN
+// =======================
+//
 
-// Protected pages
-app.get('/admin/dashboard', requireAdminPage, (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin', 'dashboard.html'));
+process.on('SIGINT', async () => {
+
+    console.log('🛑 Shutting down...');
+
+    await mongoose.connection.close();
+
+    process.exit(0);
+
 });
 
-app.get('/admin/enquiries', requireAdminPage, (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin', 'que.html'));
+//
+// =======================
+// START SERVER
+// =======================
+//
+
+app.listen(PORT, () => {
+    console.log(`🚗 T&M Motors server running on port ${PORT}`);
 });
-
-app.get('/admin/preorders', requireAdminPage, (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin', 'preorders.html'));
-});
-
-// Protected static admin assets
-app.use('/admin', requireAdminPage, express.static(path.join(__dirname, 'admin')));
-
-// 404
-app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.url} not found` }));
-
-app.listen(PORT, () => console.log(`🚗 T&M Motors running on http://localhost:${PORT}`));

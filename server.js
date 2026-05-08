@@ -63,7 +63,7 @@ app.use(express.urlencoded({
     limit: '10mb'
 }));
 
-app.use(mongoSanitize());
+app.use(mongoSanitize({ allowDots: true, replaceWith: '_' }));
 app.use(xss());
 
 app.use(morgan('combined'));

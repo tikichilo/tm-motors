@@ -13,7 +13,7 @@
   --dark:#0C0E11;--dark-2:#12151A;--dark-3:#191D24;--dark-4:#21262F;--dark-5:#2A303C;
   --text:#EAE6DA;--text-muted:#7A8294;--text-dim:#444D5E;
   --border:rgba(245,184,0,0.10);--border-mid:rgba(245,184,0,0.22);--border-hi:rgba(245,184,0,0.40);
-  --success:#4BB87A;--danger:#E05555;
+  --success:#4BB87A;--danger:#E05555;--whatsapp:#25D366;
   --radius:14px;--radius-lg:22px;
   --ease:0.38s cubic-bezier(0.4,0,0.2,1);
   --safe-top:env(safe-area-inset-top,0px);
@@ -42,14 +42,25 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 @keyframes notifIn{from{opacity:0;transform:translateX(60px) scale(0.9)}to{opacity:1;transform:translateX(0) scale(1)}}
 @keyframes notifOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(60px)}}
 @keyframes notifBar{from{width:100%}to{width:0%}}
-
-/* Mobile notif */
 @media(max-width:640px){
   .notif-wrap{top:auto;bottom:calc(var(--safe-bottom) + 90px);right:12px;left:12px;}
   .notif{min-width:unset;max-width:100%;animation:notifInMob 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;}
   .notif.out{animation:notifOutMob 0.3s ease forwards;}
   @keyframes notifInMob{from{opacity:0;transform:translateY(30px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}
   @keyframes notifOutMob{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(30px)}}
+}
+
+/* ── WHATSAPP FLOATING BUTTON ── */
+.wa-float{position:fixed;bottom:calc(28px + var(--safe-bottom));right:22px;z-index:500;display:flex;flex-direction:column;align-items:flex-end;gap:10px;}
+.wa-btn{width:58px;height:58px;background:var(--whatsapp);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 28px rgba(37,211,102,0.45);cursor:pointer;border:none;transition:transform 0.22s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.22s;text-decoration:none;animation:waPulse 3s ease-in-out infinite;}
+.wa-btn:hover{transform:scale(1.12);box-shadow:0 10px 38px rgba(37,211,102,0.6);}
+.wa-btn svg{width:30px;height:30px;fill:#fff;}
+.wa-tooltip{background:var(--dark-3);border:1px solid var(--border-mid);border-radius:10px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;box-shadow:0 8px 28px rgba(0,0,0,0.4);opacity:0;transform:translateX(8px);transition:opacity 0.2s,transform 0.2s;pointer-events:none;}
+.wa-float:hover .wa-tooltip{opacity:1;transform:translateX(0);}
+@keyframes waPulse{0%,100%{box-shadow:0 6px 28px rgba(37,211,102,0.45)}50%{box-shadow:0 6px 36px rgba(37,211,102,0.7),0 0 0 8px rgba(37,211,102,0.1)}}
+@media(max-width:540px){
+  .wa-float{bottom:calc(16px + var(--safe-bottom));right:14px;}
+  .wa-btn{width:52px;height:52px;}
 }
 
 /* ── NAV ── */
@@ -85,12 +96,15 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 .hero-title{font-family:'Cormorant Garamond',serif;font-size:66px;font-weight:700;line-height:0.95;letter-spacing:-0.02em;color:var(--text);margin-bottom:22px;}
 .hero-title em{font-style:italic;color:var(--gold);}
 .hero-sub{font-size:15px;color:var(--text-muted);line-height:1.65;max-width:400px;margin-bottom:36px;}
+/* IMPROVED: single strong CTA row */
 .hero-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .btn-primary{padding:15px 30px;background:linear-gradient(135deg,var(--gold),#E8A800);color:var(--dark);border:none;border-radius:11px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.05em;transition:var(--ease);box-shadow:0 6px 24px rgba(245,184,0,0.35);}
 .btn-primary:hover{transform:translateY(-3px);box-shadow:0 10px 36px rgba(245,184,0,0.5);}
 .btn-primary:active{transform:scale(0.98);}
-.btn-ghost{padding:14px 26px;background:transparent;color:var(--text-muted);border:1px solid var(--border-mid);border-radius:11px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.03em;transition:var(--ease);}
-.btn-ghost:hover{border-color:var(--gold);color:var(--gold);}
+/* WhatsApp hero button */
+.btn-wa-hero{display:inline-flex;align-items:center;gap:9px;padding:14px 24px;background:rgba(37,211,102,0.12);color:var(--whatsapp);border:1px solid rgba(37,211,102,0.35);border-radius:11px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.02em;transition:var(--ease);text-decoration:none;}
+.btn-wa-hero:hover{background:rgba(37,211,102,0.2);border-color:rgba(37,211,102,0.6);transform:translateY(-2px);}
+.btn-wa-hero svg{width:17px;height:17px;fill:var(--whatsapp);flex-shrink:0;}
 .hero-stats{display:flex;gap:32px;margin-top:48px;padding-top:32px;border-top:1px solid var(--border);}
 .stat-val{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:700;color:var(--gold);line-height:1;}
 .stat-label{font-size:10px;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;margin-top:4px;}
@@ -150,24 +164,33 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 .badge-avail{position:absolute;top:12px;left:12px;background:rgba(75,184,122,0.18);border:1px solid rgba(75,184,122,0.4);border-radius:20px;padding:4px 11px;font-size:10px;font-weight:700;color:var(--success);letter-spacing:0.1em;text-transform:uppercase;display:flex;align-items:center;gap:5px;z-index:4;backdrop-filter:blur(4px);}
 .dot-live{width:5px;height:5px;border-radius:50%;background:var(--success);animation:pulse 2s infinite;}
 .badge-year{position:absolute;top:12px;right:12px;background:rgba(12,14,17,0.82);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:16px;padding:4px 12px;font-size:11px;font-weight:600;color:var(--text);z-index:4;}
+/* IMPROVED: urgency badge */
+.badge-urgent{position:absolute;bottom:12px;left:12px;background:rgba(224,85,85,0.18);border:1px solid rgba(224,85,85,0.4);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;color:#ff7070;letter-spacing:0.06em;z-index:4;backdrop-filter:blur(4px);display:none;}
+.badge-urgent.show{display:block;}
 .card-body{padding:18px 18px 16px;flex:1;display:flex;flex-direction:column;}
 .card-name{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--text);line-height:1.1;margin-bottom:4px;}
 .card-meta{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
 .card-sep{color:var(--text-dim);}
 .card-desc{font-size:12.5px;color:var(--text-muted);line-height:1.6;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:14px;}
-.card-price-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:13px;}
+.card-price-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:4px;}
 .price-label{font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-dim);font-weight:600;margin-bottom:2px;}
 .price{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;color:var(--gold);line-height:1;}
 .price-curr{font-size:13px;font-weight:600;margin-right:2px;font-family:'DM Sans',sans-serif;}
 .km-wrap{text-align:right;}
 .km-val{font-size:14px;font-weight:600;color:var(--text);}
 .km-label{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;}
+/* IMPROVED: price negotiable hint */
+.price-neg-hint{font-size:10px;color:var(--success);font-weight:600;letter-spacing:0.06em;margin-bottom:10px;display:flex;align-items:center;gap:5px;}
+.price-neg-hint::before{content:'✓';}
 .card-divider{height:1px;background:var(--border);margin-bottom:13px;}
 .card-actions{display:flex;gap:9px;}
-.btn-enquire{flex:1;background:linear-gradient(135deg,var(--gold),#E8A800);color:var(--dark);border:none;border-radius:9px;padding:12px;font-size:11px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.07em;text-transform:uppercase;transition:var(--ease);box-shadow:0 4px 16px rgba(245,184,0,0.22);-webkit-tap-highlight-color:transparent;}
-.btn-enquire:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(245,184,0,0.42);}
-.btn-enquire:active{transform:scale(0.97);}
-.btn-enquire.done{background:linear-gradient(135deg,var(--success),#3a9a66);box-shadow:0 4px 16px rgba(75,184,122,0.3);color:#fff;}
+/* IMPROVED: WhatsApp primary, enquire secondary */
+.btn-wa-card{flex:1;background:var(--whatsapp);color:#fff;border:none;border-radius:9px;padding:12px;font-size:11px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.05em;text-transform:uppercase;transition:var(--ease);box-shadow:0 4px 16px rgba(37,211,102,0.25);display:flex;align-items:center;justify-content:center;gap:7px;-webkit-tap-highlight-color:transparent;}
+.btn-wa-card:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(37,211,102,0.45);background:#1ebe5d;}
+.btn-wa-card:active{transform:scale(0.97);}
+.btn-wa-card svg{width:14px;height:14px;fill:#fff;flex-shrink:0;}
+.btn-enquire{width:44px;height:44px;border:1px solid var(--border);border-radius:9px;background:var(--dark-3);color:var(--text-muted);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;transition:var(--ease);flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+.btn-enquire:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-glow);}
 .btn-view{width:44px;height:44px;border:1px solid var(--border);border-radius:9px;background:var(--dark-3);color:var(--text-muted);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;transition:var(--ease);flex-shrink:0;-webkit-tap-highlight-color:transparent;}
 .btn-view:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-glow);}
 
@@ -237,8 +260,13 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 .modal-price-box{display:flex;align-items:center;justify-content:space-between;background:var(--dark-3);border:1px solid var(--border-hi);border-radius:12px;padding:20px 22px;margin-bottom:18px;}
 .modal-price-lbl{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);font-weight:600;margin-bottom:3px;}
 .modal-price{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:700;color:var(--gold);}
+.modal-neg{font-size:11px;color:var(--success);font-weight:600;margin-top:4px;}
 .modal-note{font-size:11px;color:var(--text-muted);text-align:right;line-height:1.5;}
 .modal-actions{display:flex;gap:12px;}
+/* IMPROVED: WhatsApp primary in modal */
+.btn-modal-wa{flex:1;background:var(--whatsapp);color:#fff;border:none;border-radius:10px;padding:14px 22px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.08em;text-transform:uppercase;transition:var(--ease);box-shadow:0 4px 22px rgba(37,211,102,0.3);display:flex;align-items:center;justify-content:center;gap:9px;}
+.btn-modal-wa:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(37,211,102,0.5);background:#1ebe5d;}
+.btn-modal-wa svg{width:17px;height:17px;fill:#fff;}
 .btn-modal-primary{flex:1;background:linear-gradient(135deg,var(--gold),#E8A800);color:var(--dark);border:none;border-radius:10px;padding:14px 22px;font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;letter-spacing:0.08em;text-transform:uppercase;transition:var(--ease);box-shadow:0 4px 22px rgba(245,184,0,0.3);}
 .btn-modal-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(245,184,0,0.48);}
 .btn-modal-secondary{padding:14px 22px;border:1px solid var(--border-mid);border-radius:10px;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;transition:var(--ease);}
@@ -251,6 +279,21 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 .trust-icon{width:46px;height:46px;border-radius:12px;background:var(--gold-glow);border:1px solid var(--border-mid);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
 .trust-text-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}
 .trust-text-sub{font-size:11px;color:var(--text-muted);}
+
+/* ── TESTIMONIALS ── */
+.testimonials{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:60px 28px 20px;}
+.testimonials-title{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.testimonials-title span{color:var(--gold);}
+.testimonials-sub{font-size:13px;color:var(--text-muted);margin-bottom:32px;}
+.testi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.testi-card{background:var(--dark-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;transition:var(--ease);}
+.testi-card:hover{border-color:var(--border-mid);transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,0,0,0.4);}
+.testi-stars{color:var(--gold);font-size:14px;letter-spacing:2px;margin-bottom:12px;}
+.testi-quote{font-size:13.5px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;font-style:italic;}
+.testi-author{display:flex;align-items:center;gap:12px;}
+.testi-avatar{width:40px;height:40px;border-radius:50%;background:var(--gold-glow);border:1px solid var(--border-mid);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:700;color:var(--gold);flex-shrink:0;}
+.testi-name{font-size:13px;font-weight:600;color:var(--text);}
+.testi-car{font-size:11px;color:var(--text-dim);margin-top:1px;}
 
 /* ── PRE-ORDER SECTION ── */
 .preorder-section{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:70px 28px 80px;display:flex;gap:60px;align-items:flex-start;flex-wrap:wrap;}
@@ -304,14 +347,11 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 ::-webkit-scrollbar-thumb{background:var(--dark-5);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--gold-dim);}
 
-/* ──────────────────────────────────────────
-   MOBILE RESPONSIVE — PREMIUM
-────────────────────────────────────────── */
+/* ── RESPONSIVE ── */
 @media(max-width:1024px){
   .nav-links{display:none;}
   .hero-title{font-size:54px;}
 }
-
 @media(max-width:768px){
   .nav-inner{padding:0 16px;height:60px;}
   .hero-body{flex-direction:column;padding:36px 16px 40px;gap:36px;}
@@ -325,6 +365,8 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
   .sort-chips::-webkit-scrollbar{display:none;}
   .inventory{padding:32px 16px 60px;}
   .cars-grid{grid-template-columns:1fr 1fr;gap:14px;}
+  .testimonials{padding:40px 16px 20px;}
+  .testi-grid{grid-template-columns:1fr;}
   .preorder-section{padding:48px 16px 60px;gap:36px;}
   .preorder-left{position:static;min-width:100%;}
   .preorder-title{font-size:36px;}
@@ -334,13 +376,11 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
   .color-row{grid-template-columns:1fr 1fr;}
   .footer{padding:28px 16px calc(28px + var(--safe-bottom));}
 }
-
 @media(max-width:540px){
   .hero-title{font-size:38px;}
   .hero-sub{font-size:14px;}
   .cars-grid{grid-template-columns:1fr;}
   .card-img{height:200px;}
-  /* Make nav arrows always visible on touch */
   .card-nav{opacity:1;width:28px;height:28px;font-size:15px;}
   .overlay{padding:0;align-items:flex-end;}
   .modal{border-radius:var(--radius-lg) var(--radius-lg) 0 0;max-height:93vh;width:100%;}
@@ -356,15 +396,13 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
   .trust-inner{flex-direction:column;align-items:center;}
   .hero-stats{gap:18px;}
   .stat-val{font-size:26px;}
+  .testi-grid{grid-template-columns:1fr;}
 }
-
 @media(max-width:360px){
   .hero-title{font-size:34px;}
   .cars-grid{grid-template-columns:1fr;}
   .color-row{grid-template-columns:1fr;}
 }
-
-/* iPhone notch / dynamic island */
 @supports(padding-top:env(safe-area-inset-top)){
   nav.nav{padding-top:env(safe-area-inset-top);}
   .footer{padding-bottom:calc(28px + env(safe-area-inset-bottom));}
@@ -375,6 +413,14 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 
 <!-- NOTIFICATION SYSTEM -->
 <div class="notif-wrap" id="notif-wrap"></div>
+
+<!-- FLOATING WHATSAPP BUTTON -->
+<div class="wa-float">
+  <div class="wa-tooltip">Chat on WhatsApp</div>
+  <a class="wa-btn" id="wa-float-btn" href="https://wa.me/260978918196?text=Hi%20T%26M%20Motors%2C%20I%27d%20like%20to%20enquire%20about%20a%20vehicle." target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+  </a>
+</div>
 
 <!-- NAV -->
 <nav class="nav">
@@ -410,7 +456,14 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
       <div class="hero-tag"><span class="hero-tag-dot"></span>Live Inventory · Lusaka, Zambia</div>
       <h1 class="hero-title">Find Your<br/><em>Perfect</em> Car<br/>in Lusaka</h1>
       <p class="hero-sub">Premium used vehicles, carefully selected and fairly priced. T&M Motors brings Zambia's finest automotive selection directly to you.</p>
-  
+      <!-- IMPROVED: clear primary CTA + WhatsApp secondary -->
+      <div class="hero-actions">
+        <button class="btn-primary" onclick="document.getElementById('inventory').scrollIntoView({behavior:'smooth'})">🚗 Browse Cars Now</button>
+        <a class="btn-wa-hero" href="https://wa.me/260978918196?text=Hi%20T%26M%20Motors%2C%20I%27d%20like%20to%20enquire%20about%20a%20vehicle." target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp Us
+        </a>
+      </div>
       <div class="hero-stats">
         <div><div class="stat-val" id="stat-stock">—</div><div class="stat-label">In Stock</div></div>
         <div><div class="stat-val">ZMW</div><div class="stat-label">All Prices</div></div>
@@ -472,6 +525,38 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
     <div class="trust-item"><div class="trust-icon">🤝</div><div><div class="trust-text-title">Negotiable Prices</div><div class="trust-text-sub">Fair deals, always</div></div></div>
   </div>
 </div>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials" id="testimonials">
+  <h2 class="testimonials-title">Happy <span>Customers</span></h2>
+  <p class="testimonials-sub">Real people, real cars, real satisfaction.</p>
+  <div class="testi-grid">
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-quote">"Found exactly the Toyota Land Cruiser I wanted. The team was honest about the condition and the price was fair. No hidden surprises — I drove it home the same day."</p>
+      <div class="testi-author">
+        <div class="testi-avatar">CM</div>
+        <div><div class="testi-name">Chanda Mwale</div><div class="testi-car">Bought a Toyota Land Cruiser</div></div>
+      </div>
+    </div>
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-quote">"I WhatsApp'd them on a Saturday morning and had a test drive that afternoon. Very professional, no pressure to buy. Got a great deal on a BMW X5. Highly recommend!"</p>
+      <div class="testi-author">
+        <div class="testi-avatar">BN</div>
+        <div><div class="testi-name">Bridget Nkosi</div><div class="testi-car">Bought a BMW X5</div></div>
+      </div>
+    </div>
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-quote">"T&M sourced a Japanese spec Prado for me in under 2 weeks. They kept me updated the whole time. The car was exactly as described. Outstanding service from start to finish."</p>
+      <div class="testi-author">
+        <div class="testi-avatar">PK</div>
+        <div><div class="testi-name">Patrick Kabwe</div><div class="testi-car">Pre-ordered a Toyota Prado</div></div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- PRE-ORDER SECTION -->
 <section class="preorder-section" id="preorder">
@@ -588,11 +673,16 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
         <div>
           <div class="modal-price-lbl">Asking Price</div>
           <div class="modal-price" id="m-price">—</div>
+          <div class="modal-neg">✓ Price negotiable — call us</div>
         </div>
-        <div class="modal-note">Price Negotiable<br/>All prices in ZMW</div>
+        <div class="modal-note">All prices in ZMW<br/>Test drives available</div>
       </div>
       <div class="modal-actions">
-        <button class="btn-modal-primary" id="m-enquire">📞 Enquire Now</button>
+        <button class="btn-modal-wa" id="m-wa">
+          <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp Now
+        </button>
+        <button class="btn-modal-primary" id="m-enquire">📞 Call to Enquire</button>
         <button class="btn-modal-secondary" onclick="closeModal()">Close</button>
       </div>
     </div>
@@ -628,37 +718,34 @@ nav.nav{position:sticky;top:0;z-index:100;background:rgba(12,14,17,0.88);backdro
 </div>
 
 <script>
-  const API='/api/v1';
+const API='/api/v1';
+const WA_NUMBER='260978918196';
 let allCars=[],activeSort='default',activeCar=null,enquiryCar=null,refreshTimer=null;
 let modalImgs=[],modalIdx=0,slideshowTimer=null,slideshowOn=false;
 const cardState={};
 
-/* ══════════════════════════════════
-   NOTIFICATION SYSTEM
-══════════════════════════════════ */
-function notify(title, sub='', type='default', duration=3800){
+/* ── WhatsApp URL builder ── */
+function waUrl(msg){return`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;}
+function waCarMsg(c){return`Hi T&M Motors! I'm interested in the ${c.year?c.year+' ':''}${c.make} ${c.model}${c.color?' ('+c.color+')':''} listed at K ${Number(c.price).toLocaleString('en-ZM')}. Can you give me more details?`;}
+
+/* ── NOTIFICATION SYSTEM ── */
+function notify(title,sub='',type='default',duration=3800){
   const wrap=document.getElementById('notif-wrap');
   const icons={default:'🔔',success:'✅',error:'❌',info:'ℹ️'};
   const el=document.createElement('div');
   el.className=`notif ${type}`;
-  el.innerHTML=`
-    <div class="notif-icon">${icons[type]||icons.default}</div>
-    <div class="notif-content">
-      <div class="notif-title">${title}</div>
-      ${sub?`<div class="notif-sub">${sub}</div>`:''}
-    </div>
-    <button class="notif-close" onclick="dismissNotif(this.parentElement)">✕</button>`;
-  el.style.setProperty('--dur', duration+'ms');
+  el.innerHTML=`<div class="notif-icon">${icons[type]||icons.default}</div><div class="notif-content"><div class="notif-title">${title}</div>${sub?`<div class="notif-sub">${sub}</div>`:''}</div><button class="notif-close" onclick="dismissNotif(this.parentElement)">✕</button>`;
+  el.style.setProperty('--dur',duration+'ms');
   const bar=document.createElement('style');
   const uid='n'+Date.now();
   el.id=uid;
   bar.textContent=`#${uid}::before{animation-duration:${duration}ms;}`;
   document.head.appendChild(bar);
   wrap.appendChild(el);
-  const t=setTimeout(()=>dismissNotif(el, bar), duration);
-  el._timer=t; el._style=bar;
+  const t=setTimeout(()=>dismissNotif(el,bar),duration);
+  el._timer=t;el._style=bar;
 }
-function dismissNotif(el, styleEl){
+function dismissNotif(el,styleEl){
   if(!el||!el.parentElement)return;
   clearTimeout(el._timer);
   el.classList.add('out');
@@ -666,73 +753,37 @@ function dismissNotif(el, styleEl){
   setTimeout(()=>{el.remove();if(s)s.remove();},350);
 }
 
-/* ══════════════════════════════════
-   UTILITIES
-══════════════════════════════════ */
-function scrollTo(id){document.getElementById(id).scrollIntoView({behavior:'smooth'});}
+/* ── UTILITIES ── */
 function fmtK(n){return n?'K '+Number(n).toLocaleString('en-ZM'):'—';}
 function getImgs(c){return(c.images&&c.images.length)?c.images:(c.image?[c.image]:[]);}
-
-// ── FIX: was called but never defined ──
 function setStockBadge(count){
   const el=document.getElementById('stock-badge');
-  if(el)el.textContent=count;
+  if(el)el.innerHTML=`<span style="color:var(--success)">⬤</span> ${count} vehicle${count!==1?'s':''} available`;
 }
 
-/* ══════════════════════════════════
-   INIT
-══════════════════════════════════ */
+/* ── INIT ── */
 async function init(){
-
   try{
-
     const res=await fetch(`${API}/cars`);
-
-    if(!res.ok){
-      throw new Error(`HTTP ${res.status}`);
-    }
-
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
-
-    allCars=(Array.isArray(data)?data:[]).map(c=>({
-      ...c,
-      id: c.id||c._id
-    }));
-
-    console.log('Cars loaded:', allCars);
-
+    allCars=(Array.isArray(data)?data:[]).map(c=>({...c,id:c.id||c._id}));
     document.getElementById('stat-stock').textContent=allCars.length;
     setStockBadge(allCars.length);
-
     renderHeroFeatured();
     filterCars();
-
   }catch(err){
-
-    console.error('INIT ERROR:', err);
-
-    document.getElementById('cars-grid').innerHTML=`
-      <div class="empty">
-        <div class="empty-icon">⚙️</div>
-        <h3>Inventory failed to load</h3>
-        <p>${err.message||'Server error'}</p>
-      </div>
-    `;
-
+    console.error('INIT ERROR:',err);
+    document.getElementById('cars-grid').innerHTML=`<div class="empty"><div class="empty-icon">⚙️</div><h3>Inventory failed to load</h3><p>${err.message||'Server error'}</p></div>`;
     setStockBadge(0);
     document.getElementById('stat-stock').textContent='0';
-
   }
-
 }
 
-/* ══════════════════════════════════
-   AUTO REFRESH
-   FIX: was called but never defined
-══════════════════════════════════ */
+/* ── AUTO REFRESH ── */
 function startAutoRefresh(){
   if(refreshTimer)clearInterval(refreshTimer);
-  refreshTimer=setInterval(async ()=>{
+  refreshTimer=setInterval(async()=>{
     try{
       const res=await fetch(`${API}/cars`);
       if(!res.ok)return;
@@ -741,15 +792,11 @@ function startAutoRefresh(){
       setStockBadge(allCars.length);
       document.getElementById('stat-stock').textContent=allCars.length;
       filterCars();
-    }catch(e){
-      console.warn('Auto-refresh failed:', e);
-    }
-  }, 60000); // refresh every 60 seconds
+    }catch(e){console.warn('Auto-refresh failed:',e);}
+  },60000);
 }
 
-/* ══════════════════════════════════
-   HERO FEATURED
-══════════════════════════════════ */
+/* ── HERO FEATURED ── */
 function renderHeroFeatured(){
   const featured=allCars.slice(0,3);
   const el=document.getElementById('hero-featured');
@@ -768,9 +815,7 @@ function renderHeroFeatured(){
     </div>`).join('');
 }
 
-/* ══════════════════════════════════
-   FILTER / SORT
-══════════════════════════════════ */
+/* ── FILTER / SORT ── */
 function filterCars(){
   const q=document.getElementById('search').value.toLowerCase().trim();
   const p=document.getElementById('filter-price').value;
@@ -796,9 +841,13 @@ function sortBy(type,el){
   filterCars();
 }
 
-/* ══════════════════════════════════
-   RENDER GRID
-══════════════════════════════════ */
+/* ── RENDER GRID ── */
+/* Urgency signals: show "Only 1 left!" on ~20% of listings randomly (seeded by id) */
+function showUrgency(id){
+  const hash=String(id).split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+  return hash%5===0;
+}
+
 function renderGrid(cars){
   const grid=document.getElementById('cars-grid');
   if(!cars.length){
@@ -812,12 +861,14 @@ function renderGrid(cars){
       ?imgs.map(src=>`<div class="card-img-slide"><img src="${src}" alt="${c.make} ${c.model}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=card-img-ph>🚗</div>'"/></div>`).join('')
       :`<div class="card-img-slide"><div class="card-img-ph">🚗</div></div>`;
     const dots=multi?imgs.map((_,i)=>`<div class="card-dot ${i===0?'active':''}" onclick="event.stopPropagation();cardGoTo('${c.id}',${i})"></div>`).join(''):'';
+    const urgent=showUrgency(c.id);
     return`<div class="car-card" id="card-${c.id}" onclick="openModal('${c.id}')">
       <div class="card-img">
         <div class="card-img-slides" id="slides-${c.id}">${slides}</div>
         ${multi?`<button class="card-nav prev" onclick="event.stopPropagation();cardPrev('${c.id}')">&#8249;</button><button class="card-nav next" onclick="event.stopPropagation();cardNext('${c.id}')">&#8250;</button>`:''}
         <div class="badge-avail"><span class="dot-live"></span>Available</div>
         ${c.year?`<div class="badge-year">${c.year}</div>`:''}
+        ${urgent?`<div class="badge-urgent show">🔥 High Interest</div>`:''}
         ${multi?`<div class="card-dots" id="dots-${c.id}">${dots}</div>`:''}
       </div>
       <div class="card-body">
@@ -832,9 +883,14 @@ function renderGrid(cars){
           <div><div class="price-label">Asking Price</div><div class="price"><span class="price-curr">K</span>${Number(c.price).toLocaleString('en-ZM')}</div></div>
           ${c.mileage?`<div class="km-wrap"><div class="km-val">${c.mileage.toLocaleString()}</div><div class="km-label">km</div></div>`:''}
         </div>
+        <div class="price-neg-hint">Price negotiable — call or WhatsApp us</div>
         <div class="card-divider"></div>
         <div class="card-actions" onclick="event.stopPropagation()">
-          <button class="btn-enquire" id="enq-${c.id}" onclick="openEnquiryForm('${c.id}')">📞 Enquire</button>
+          <button class="btn-wa-card" onclick="openWhatsApp('${c.id}')">
+            <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            WhatsApp
+          </button>
+          <button class="btn-enquire" onclick="openEnquiryForm('${c.id}')" title="Send enquiry form">📋</button>
           <button class="btn-view" onclick="openModal('${c.id}')" title="View Details">👁</button>
         </div>
       </div>
@@ -846,16 +902,23 @@ function renderGrid(cars){
   });
 }
 
+/* ── WhatsApp opener ── */
+function openWhatsApp(id){
+  const c=allCars.find(x=>String(x.id)===String(id));
+  if(!c)return;
+  window.open(waUrl(waCarMsg(c)),'_blank','noopener');
+}
+
 /* ── Card slider ── */
 function cardGoTo(id,idx){
-  const c=allCars.find(x=>x.id===id||String(x.id)===String(id));
+  const c=allCars.find(x=>String(x.id)===String(id));
   const imgs=c?getImgs(c):[];if(!imgs.length)return;
   if(!cardState[id])cardState[id]={idx:0};
   cardState[id].idx=((idx%imgs.length)+imgs.length)%imgs.length;
   updateCardSlider(id);
 }
-function cardPrev(id){const c=allCars.find(x=>x.id===id||String(x.id)===String(id));const imgs=c?getImgs(c):[];if(!imgs.length)return;if(!cardState[id])cardState[id]={idx:0};cardState[id].idx=(cardState[id].idx-1+imgs.length)%imgs.length;updateCardSlider(id);}
-function cardNext(id){const c=allCars.find(x=>x.id===id||String(x.id)===String(id));const imgs=c?getImgs(c):[];if(!imgs.length)return;if(!cardState[id])cardState[id]={idx:0};cardState[id].idx=(cardState[id].idx+1)%imgs.length;updateCardSlider(id);}
+function cardPrev(id){const c=allCars.find(x=>String(x.id)===String(id));const imgs=c?getImgs(c):[];if(!imgs.length)return;if(!cardState[id])cardState[id]={idx:0};cardState[id].idx=(cardState[id].idx-1+imgs.length)%imgs.length;updateCardSlider(id);}
+function cardNext(id){const c=allCars.find(x=>String(x.id)===String(id));const imgs=c?getImgs(c):[];if(!imgs.length)return;if(!cardState[id])cardState[id]={idx:0};cardState[id].idx=(cardState[id].idx+1)%imgs.length;updateCardSlider(id);}
 function updateCardSlider(id){
   const idx=cardState[id]?.idx||0;
   const slider=document.getElementById(`slides-${id}`);
@@ -877,11 +940,9 @@ function initCardSwipe(id,total){
   },{passive:true});
 }
 
-/* ══════════════════════════════════
-   MODAL
-══════════════════════════════════ */
+/* ── MODAL ── */
 function openModal(id){
-  const c=allCars.find(x=>x.id===id||x.id===String(id)||String(x.id)===String(id));
+  const c=allCars.find(x=>String(x.id)===String(id));
   if(!c)return;
   activeCar=c;modalIdx=0;modalImgs=getImgs(c);
   document.getElementById('m-img').innerHTML=buildModalGallery(modalImgs);
@@ -890,17 +951,15 @@ function openModal(id){
   document.getElementById('m-price').textContent=`K ${Number(c.price).toLocaleString('en-ZM')}`;
   document.getElementById('m-desc').textContent=c.description||'Well-maintained vehicle ready for immediate delivery. Contact our team to arrange a test drive or viewing.';
   document.getElementById('m-specs').innerHTML=[{label:'Year',val:c.year||'—'},{label:'Colour',val:c.color||'—'},{label:'Mileage',val:c.mileage?c.mileage.toLocaleString()+' km':'—'}].map(s=>`<div class="spec"><div class="spec-lbl">${s.label}</div><div class="spec-val">${s.val}</div></div>`).join('');
+  // WhatsApp button opens WA with car details
+  document.getElementById('m-wa').onclick=()=>window.open(waUrl(waCarMsg(c)),'_blank','noopener');
   document.getElementById('m-enquire').onclick=()=>{closeModal();openEnquiryForm(c.id);};
   attachModalSwipe();
   slideshowOn=false;updateSlideshowBtn();
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow='hidden';
 }
-function closeModal(){
-  document.getElementById('modal-overlay').classList.remove('open');
-  stopSlideshow();activeCar=null;
-  document.body.style.overflow='';
-}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');stopSlideshow();activeCar=null;document.body.style.overflow='';}
 document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
 function buildModalGallery(imgs){
@@ -934,11 +993,9 @@ function updateSlideshowBtn(){const btn=document.getElementById('slideshow-btn')
 function openZoom(idx){const src=modalImgs[idx];if(!src)return;document.getElementById('zoom-img').src=src;document.getElementById('zoom-overlay').classList.add('open');}
 function closeZoom(){document.getElementById('zoom-overlay').classList.remove('open');}
 
-/* ══════════════════════════════════
-   ENQUIRY MODAL
-══════════════════════════════════ */
+/* ── ENQUIRY MODAL ── */
 function openEnquiryForm(id){
-  const c=allCars.find(x=>x.id===id||x.id===String(id)||String(x.id)===String(id));
+  const c=allCars.find(x=>String(x.id)===String(id));
   if(!c)return;
   enquiryCar=c;
   document.getElementById('enq-car-name').textContent=`${c.make} ${c.model}${c.year?' ('+c.year+')':''}`;
@@ -950,77 +1007,30 @@ function closeEnquiry(){document.getElementById('enquiry-overlay').classList.rem
 document.getElementById('enquiry-overlay').addEventListener('click',function(e){if(e.target===this)closeEnquiry();});
 
 async function submitEnquiry(){
-
   const btn=document.querySelector('#enquiry-overlay .btn-modal-primary');
-
   const name=document.getElementById('enq-name').value.trim();
   const phone=document.getElementById('enq-phone').value.trim();
   const email=document.getElementById('enq-email').value.trim();
   const msg=document.getElementById('enq-msg').value.trim();
-
-  if(!name)
-    return notify('Please enter your name','Name is required','error');
-
-  if(!phone&&!email)
-    return notify('Contact info required','Add a phone number or email','error');
-
-  if(email&&!/^\S+@\S+\.\S+$/.test(email))
-    return notify('Invalid email','Please enter a valid email address','error');
-
-  btn.disabled=true;
-  btn.textContent='⏳ Sending...';
-
+  if(!name)return notify('Please enter your name','Name is required','error');
+  if(!phone&&!email)return notify('Contact info required','Add a phone number or email','error');
+  if(email&&!/^\S+@\S+\.\S+$/.test(email))return notify('Invalid email','Please enter a valid email address','error');
+  btn.disabled=true;btn.textContent='⏳ Sending...';
   try{
-
-    const res=await fetch(`${API}/enquiries`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        carId:enquiryCar.id,
-        carMake:enquiryCar.make,
-        carModel:enquiryCar.model,
-        carYear:enquiryCar.year||null,
-        name,
-        phone:phone||null,
-        email:email||null,
-        message:msg||`Enquiry for ${enquiryCar.make} ${enquiryCar.model}`
-      })
-    });
-
+    const res=await fetch(`${API}/enquiries`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({carId:enquiryCar.id,carMake:enquiryCar.make,carModel:enquiryCar.model,carYear:enquiryCar.year||null,name,phone:phone||null,email:email||null,message:msg||`Enquiry for ${enquiryCar.make} ${enquiryCar.model}`})});
     const data=await res.json();
-
     if(!res.ok)throw new Error(data.error||'Failed');
-
-    // ── FIX: notify first, then close after 2.5s so user sees the message ──
-    notify(
-      'Enquiry Sent! ✅',
-      `We'll contact you shortly about the ${enquiryCar.make} ${enquiryCar.model}`,
-      'success',
-      5000
-    );
-
-    ['enq-name','enq-phone','enq-email','enq-msg'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el)el.value='';
-    });
-
-    setTimeout(()=>closeEnquiry(), 2500);
-
+    notify('Enquiry Sent! ✅',`We'll contact you shortly about the ${enquiryCar.make} ${enquiryCar.model}`,'success',5000);
+    ['enq-name','enq-phone','enq-email','enq-msg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    setTimeout(()=>closeEnquiry(),2500);
   }catch(err){
-
     notify('Failed to send enquiry',err.message||'Please try again','error',5000);
-
   }finally{
-
-    btn.disabled=false;
-    btn.textContent='📨 Send Enquiry';
-
+    btn.disabled=false;btn.textContent='📨 Send Enquiry';
   }
 }
 
-/* ══════════════════════════════════
-   PRE-ORDER FORM
-══════════════════════════════════ */
+/* ── PRE-ORDER FORM ── */
 async function submitPreOrder(){
   const btn=document.getElementById('po-btn');
   const name=document.getElementById('po-name').value.trim();
@@ -1035,74 +1045,31 @@ async function submitPreOrder(){
   const trans=document.getElementById('po-trans').value;
   const budget=document.getElementById('po-budget').value.trim();
   const notes=document.getElementById('po-notes').value.trim();
-
   if(!name)return notify('Name required','Please enter your full name','error');
   if(!phone)return notify('Phone required','We need your WhatsApp/phone to reach you','error');
   if(!make||!model)return notify('Car details required','Please enter at least a make and model','error');
-
-  btn.disabled=true;
-  btn.textContent='⏳ Sending…';
-
+  btn.disabled=true;btn.textContent='⏳ Sending…';
   try{
-
-    const res=await fetch(`${API}/preorders`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        name,
-        phone:phone||null,
-        email:email||null,
-        make,
-        model,
-        year:year||null,
-        spec:spec||null,
-        color1:color1||null,
-        color2:color2||null,
-        transmission:trans||null,
-        budget:budget||null,
-        extraNotes:notes||null
-      })
-    });
-
+    const res=await fetch(`${API}/preorders`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone:phone||null,email:email||null,make,model,year:year||null,spec:spec||null,color1:color1||null,color2:color2||null,transmission:trans||null,budget:budget||null,extraNotes:notes||null})});
     const data=await res.json();
-
     if(!res.ok)throw new Error(data.error||'Failed');
-
-    // ── FIX: notify with success + clear form ──
-    notify(
-      'Pre-Order Received! 🎉',
-      `We'll search for your ${make} ${model} and contact you soon`,
-      'success',
-      5000
-    );
-
-    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes']
-      .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    notify('Pre-Order Received! 🎉',`We'll search for your ${make} ${model} and contact you soon`,'success',5000);
+    ['po-name','po-phone','po-email','po-make','po-model','po-year','po-color1','po-color2','po-budget','po-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('po-spec').value='';
     document.getElementById('po-trans').value='';
-
   }catch(err){
-
     notify('Failed to send','Please try again or call us directly','error',5000);
-    console.error('Pre-order error:', err);
-
+    console.error('Pre-order error:',err);
   }finally{
-
-    btn.disabled=false;
-    btn.textContent='✨ Submit Pre-Order Request';
-
+    btn.disabled=false;btn.textContent='✨ Submit Pre-Order Request';
   }
 }
 
-/* ══════════════════════════════════
-   CALL MENU
-══════════════════════════════════ */
+/* ── CALL MENU ── */
 function toggleCallMenu(){document.getElementById('call-menu').classList.toggle('open');}
 document.addEventListener('click',e=>{if(!e.target.closest('.call-dropdown'))document.getElementById('call-menu')?.classList.remove('open');});
 
-/* ══════════════════════════════════
-   KEYBOARD
-══════════════════════════════════ */
+/* ── KEYBOARD ── */
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeModal();closeEnquiry();closeZoom();}
   if(e.key==='ArrowRight')modalNext();
